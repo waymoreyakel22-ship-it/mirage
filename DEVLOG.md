@@ -1,0 +1,125 @@
+# Mirage — dev log
+
+## 2026-06-04 (gate) — Phase 1 complete
+
+Final Phase 1 gate adjustments (build clean, CSS bundle ~13.7 kB):
+- Preview panel initial height 0.28 → **0.22** of viewport (`useResizablePanels.ts`)
+- Wordmark color `#686868` → **`#444444`** (`Sidebar.css`)
+- Accent count trimmed 5 → **4**: dropped the AI-thoughts active-step dot to neutral `#7A7A7A` (`AiThoughts.css`)
+
+**Phase 1 gate — all 10 verified:**
+1. Three columns, resizable, preview + timeline + mode tabs ✓
+2. Media pool: folder tree, thumbnail grid, list/grid toggle, + New folder ✓
+3. No gradients/glows/neon; accent `#7B6EF6` in 4 places (playhead · active mode tab · suggestion card border · folder-rename focus) ✓
+4. All panels resizable — preview/timeline vertical, sidebar + right horizontal ✓
+5. Suggestion cards left border accent ✓
+6. Empty track area `#0A0A0A` ✓
+7. Preview ~22% height ✓
+8. Wordmark 11px `#444444` weight 400 ✓
+9. All timecodes + metadata monospace ✓
+10. Pure shell — nothing functional ✓
+
+Status: **Phase 1 closed, awaiting sign-off before Phase 2.** Do not start Phase 2 until user confirms.
+
+## 2026-06-04 (later) — modular refactor
+
+Adopted standing pro-NLE design + engineering standards (muted palette, real video microcopy, stateful async UX, strict modularization, no ghost actions, secure server-side media handling). The modularization rule reverses the original "one App.tsx" decision.
+
+Split the ~600-line monolith into a module tree (behavior identical, build clean, CSS bundle unchanged at ~13.7 kB):
+
+```
+src/
+  App.tsx                  — thin shell: grid + useResizablePanels, composes the 3 panels + handles
+  App.css                  — tokens, base elements, .app grid, shared utils (.flex-spacer/.timecode/.section-label)
+  types.ts                 — CenterMode / RightTab / Tool / Kind / BinView / Folder / Asset
+  lib/format.ts            — clamp, kindFromName, formatSize
+  data/
+    media.ts               — ASSET_ICONS, DEFAULT_FOLDERS, INITIAL_MEDIA
+    timeline.ts            — TRACKS, CLIPS, RULER_MARKS, TOOLS
+    inspector.ts           — FP_STATS, SUGGESTIONS, STYLE_PATTERNS, CLIP_META
+  hooks/
+    useResizablePanels.ts  — pointer drag sizing for all 3 seams (min/max + live timeline-floor clamp)
+    useMediaBin.ts         — folders/media/view/rename/context-menu/import state
+  components/  (+ co-located .css each)
+    Sidebar, MediaBin, PreviewPlayer, Timeline, AiThoughts, Center, Inspector, ResizeHandle
+```
+
+Component state now lives where it's used (Timeline owns activeTool, Center owns mode, Inspector owns its tab). Panel-size refs (centerRef/tabbarRef) created in App, passed to Center + the resize hook so the preview ceiling stays accurate.
+
+## 2026-06-04
+
+### Design overhaul — make it feel like real software
+Refs: DaVinci Resolve (near-zero color, pure function), Linear, Zed (mono-forward, brutally clean). Goal: dense, technical, low-chrome; accent rationed.
+
+**Killed**
+- Wordmark gradient → flat `#EFEFEF`
+- All decorative glows / drop-shadows (playhead, AI active dot, suggestion card hover)
+- Gradient stat bars → flat single color (`#5A5A5A` fingerprint, `#4A4A4A` style), no border-radius
+- Brightness/box-shadow clip hover → border highlight only
+
+**Added / changed**
+- Monospace (JetBrains Mono, loaded in `index.html`) via `--mono` token, applied to all numerics/technical text: timecodes, ruler labels, track labels, filenames (asset list + clips), fp values, sug-time, clip-info values, AI log lines
+- Accent `#7B6EF6` now used in exactly TWO places: playhead (diamond + line) and active mode tab top-border. Every other active state (nav, asset tabs, tools, right tabs) → neutral (`#EFEFEF` text / `#5A5A5A`–`#2C2C2C` borders)
+- Muted slate track colors: V2 `#5E8B7E` · V1 `#7079A8` · A1 `#9A8662` · A2 `#9B6B7D` (was jewel teal/purple/amber/pink)
+- Subtler chrome: `--border` `#1A1A1A`→`#181818`, new `--line #141414` for internal timeline grid; `--muted`/`--dim` retuned
+- Tighter density: track-h 42→40, ruler-h 26→24, header 64→60, smaller paddings/radii, section labels now UPPERCASE tracked
+- Build confirmed clean
+
+## 2026-06-03
+
+### Project bootstrap
+- Created fresh Vite + React + TypeScript project at `source/repos/mirage/`
+- Installed dependencies, confirmed clean build
+
+### Full shell layout built (`App.tsx` + `App.css`)
+Three-column layout, full viewport height:
+
+**Left sidebar (188px)**
+- Wordmark: "Mirage" with purple→indigo→blue gradient, Outfit 500
+- Nav: Editor (active), Auto-edit, Fingerprint, Settings — accent left-border on active
+- Asset library with Video / Music / Images tabs, thumbnail rows
+
+**Center**
+- Preview panel (44% height): transport toolbar (⏮ ⏪ ▶ ⏩ ⏭) + 16:9 video screen with dot-grid empty state
+- Timeline section (flex: 1):
+  - Toolbar: Select ↖ · Cut ✂ · Razor ⌿ · Snap ⊕ · Ripple ⊘ · Zoom +/−
+  - 64px track header column — V2 (teal), V1 (purple), A1 (amber), A2 (pink)
+  - Ruler with timecodes (0:00–0:30), playhead diamond + vertical line at 28%
+  - Mock clips: V2 title card, V1 two clips, A1 full-width, A2 two SFX clips
+  - AI thoughts panel: hidden by default (`translateY(100%)`), slides up on `.visible`
+- Mode tab bar pinned to bottom (DaVinci-style top-border accent): Timeline · AI editor · Color · Audio
+
+**Right panel (224px)**
+- Suggestions tab: fingerprint stats (Cut rate / Energy / Silence) with gradient bars + 3 suggestion cards (left accent border)
+- Style tab: 4 channel pattern bars (Pacing / Color grade / Cut style / Music sync)
+- Clip info tab: 6 metadata rows (file, duration, resolution, fps, codec, audio)
+
+### Styling
+- Font: Outfit (Google Fonts, `wght@400;500`) — loaded in `index.html`
+- Wordmark gradient: `linear-gradient(90deg, #c084fc 0%, #818cf8 52%, #60a5fa 100%)`
+- Tokens: `--bg #0C0C0C` · `--surface #0F0F0F` · `--border #1A1A1A` · `--accent #7B6EF6` · `--text #D0D0D0` · `--muted #2E2E2E` · `--dim #505050`
+- Track height 42px, ruler 26px, header column 64px
+- Fingerprint and style bars share the wordmark gradient
+- Suggestion cards: left accent border that brightens to full accent on hover
+- Playhead glow: `drop-shadow` on diamond, `box-shadow` on line
+- Alt track rows: `rgba(255,255,255,0.007)` tint for visual separation
+- AI thoughts panel: `backdrop-filter: blur(8px)`
+
+### File structure
+```
+src/
+  App.tsx       — full static layout, all data as top-level constants
+  App.css       — all styles, single file
+  index.css     — base reset only (*, html, body, #root)
+  main.tsx      — unchanged Vite entry
+index.html      — Outfit font link, title "Mirage"
+```
+
+### Status
+Static shell complete. No functionality yet — tab switching (asset library, right panel, mode tabs) and tool selection are the only live interactions. Everything else is placeholder data.
+
+### Next
+- Wire up actual playback / timeline scrubbing
+- Implement drag-and-drop from asset library to timeline
+- AI thoughts panel trigger logic
+- Actual clip selection → Clip info tab update

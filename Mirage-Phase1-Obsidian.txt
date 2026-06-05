@@ -1,0 +1,72 @@
+---
+project: Mirage
+phase: Phase 1 — Static Shell
+status: Complete (awaiting sign-off)
+date: 2026-06-04
+stack: React + TypeScript + Vite
+tags: [mirage, video-editor, phase-1, frontend]
+---
+
+# Mirage — Phase 1 Complete
+
+> [!success] Phase 1 gated 2026-06-04
+> Pure static shell. All 10 gate criteria met. **Do not start Phase 2 until sign-off.**
+
+## Gate checklist
+
+- [x] 1. Layout correct — three columns, resizable panels, preview + timeline + mode tabs
+- [x] 2. Media pool — folder tree, thumbnail grid, list/grid toggle, + New folder
+- [x] 3. Design system consistent — no gradients, no glows, no neon; accent `#7B6EF6` in ≤4 places
+- [x] 4. All panels resizable — preview/timeline vertical, sidebar + right panel horizontal
+- [x] 5. Suggestion cards have left border accent
+- [x] 6. Empty track area below last track is `#0A0A0A`
+- [x] 7. Preview panel ~22% of total height
+- [x] 8. Wordmark 11px `#444444` weight 400
+- [x] 9. All timecodes and metadata values use monospace
+- [x] 10. Nothing functional — no playback, no drag-and-drop, no AI
+
+## The 4 accent locations
+1. Playhead (diamond + line)
+2. Active mode tab (top border)
+3. Suggestion card (left border, `rgba(123,110,246,0.4)`)
+4. Folder-rename input (focus border)
+
+## Final gate fixes
+- Preview init height `0.28` → **`0.22`** of viewport — `hooks/useResizablePanels.ts`
+- Wordmark color `#686868` → **`#444444`** — `components/Sidebar.css`
+- Accent count 5 → **4**: AI-thoughts active dot dropped to neutral `#7A7A7A` — `components/AiThoughts.css`
+
+## Architecture (modular)
+```
+src/
+  App.tsx                  thin shell: grid + useResizablePanels
+  App.css                  tokens, .app grid, shared utils
+  types.ts
+  lib/format.ts            clamp, kindFromName, formatSize
+  data/                    media.ts · timeline.ts · inspector.ts
+  hooks/                   useResizablePanels.ts · useMediaBin.ts
+  components/              Sidebar · MediaBin · PreviewPlayer · Timeline ·
+                           AiThoughts · Center · Inspector · ResizeHandle  (+ co-located .css)
+```
+
+## Design tokens
+| Token | Value |
+|---|---|
+| `--bg` | `#0C0C0C` |
+| `--surface` | `#0F0F0F` |
+| `--border` | `#181818` |
+| `--line` | `#141414` |
+| `--accent` | `#7B6EF6` |
+| `--text` | `#D0D0D0` |
+| `--muted` | `#232323` |
+| `--dim` | `#565656` |
+
+Fonts: Outfit (sans, 400/500) · JetBrains Mono (mono, 400/500)
+Track colors (slate): V2 `#5E8B7E` · V1 `#7079A8` · A1 `#9A8662` · A2 `#9B6B7D`
+
+## Next — Phase 2 (blocked on sign-off)
+- [ ] Playback / transport
+- [ ] Timeline scrubbing
+- [ ] Drag-and-drop: media bin → timeline
+- [ ] AI thoughts panel trigger logic
+- [ ] Clip selection → Clip info updates

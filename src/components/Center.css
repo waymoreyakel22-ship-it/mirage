@@ -1,0 +1,57 @@
+.center {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+}
+
+.timeline-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Non-timeline modes (Color / Audio / AI editor) */
+.alt-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+}
+.alt-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dim);
+  text-transform: capitalize;
+}
+
+/* Mode tab bar — pinned bottom */
+.mode-tabbar {
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.mode-tab {
+  flex: 1;
+  padding: 10px 4px;
+  background: none;
+  border: none;
+  border-top: 2px solid transparent;
+  color: var(--dim);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.mode-tab:hover { color: var(--text); background: rgba(255, 255, 255, 0.02); }
+.mode-tab.active {
+  color: #EFEFEF;
+  border-top-color: var(--accent);
+  background: rgba(255, 255, 255, 0.02);
+}

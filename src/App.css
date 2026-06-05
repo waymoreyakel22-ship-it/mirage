@@ -1,0 +1,60 @@
+/* Global tokens, base elements, app shell, and cross-component utilities.
+   Component-specific styles live alongside each component. */
+:root {
+  --bg:       #0C0C0C;
+  --surface:  #0F0F0F;
+  --border:   #181818;
+  --line:     #141414;
+  --accent:   #7B6EF6;
+  --text:     #D0D0D0;
+  --muted:    #232323;
+  --dim:      #565656;
+  --sans:     'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono:     'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', 'Segoe UI Mono', Consolas, monospace;
+  --track-h:  40px;
+  --ruler-h:  24px;
+  --hdr-w:    60px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 188px 1fr 224px;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.flex-spacer { flex: 1; }
+
+.timecode {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--dim);
+  letter-spacing: -0.2px;
+}
+
+.section-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--dim);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
