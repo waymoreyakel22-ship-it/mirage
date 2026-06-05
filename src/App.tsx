@@ -4,6 +4,7 @@ import { Center } from './components/Center'
 import { Inspector } from './components/Inspector'
 import { ResizeHandle } from './components/ResizeHandle'
 import { Sidebar } from './components/Sidebar'
+import { SelectionProvider } from './context/SelectionContext'
 import { useResizablePanels } from './hooks/useResizablePanels'
 
 export default function App() {
@@ -12,18 +13,20 @@ export default function App() {
   const { sidebarW, rightW, previewH, startDrag } = useResizablePanels(centerRef, tabbarRef)
 
   return (
-    <div className="app" style={{ gridTemplateColumns: `${sidebarW}px 1fr ${rightW}px` }}>
-      <Sidebar />
-      <Center
-        previewH={previewH}
-        onPreviewResize={e => startDrag('preview', e)}
-        centerRef={centerRef}
-        tabbarRef={tabbarRef}
-      />
-      <Inspector />
+    <SelectionProvider>
+      <div className="app" style={{ gridTemplateColumns: `${sidebarW}px 1fr ${rightW}px` }}>
+        <Sidebar />
+        <Center
+          previewH={previewH}
+          onPreviewResize={e => startDrag('preview', e)}
+          centerRef={centerRef}
+          tabbarRef={tabbarRef}
+        />
+        <Inspector />
 
-      <ResizeHandle orientation="col" style={{ left: sidebarW }} onMouseDown={e => startDrag('sidebar', e)} />
-      <ResizeHandle orientation="col" side="right" style={{ right: rightW }} onMouseDown={e => startDrag('right', e)} />
-    </div>
+        <ResizeHandle orientation="col" style={{ left: sidebarW }} onMouseDown={e => startDrag('sidebar', e)} />
+        <ResizeHandle orientation="col" side="right" style={{ right: rightW }} onMouseDown={e => startDrag('right', e)} />
+      </div>
+    </SelectionProvider>
   )
 }

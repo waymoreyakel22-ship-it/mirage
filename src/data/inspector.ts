@@ -16,12 +16,3 @@ export const STYLE_PATTERNS = [
   { label: 'Cut style',   value: 78 },
   { label: 'Music sync',  value: 52 },
 ]
-
-export const CLIP_META: [string, string][] = [
-  ['File',       'Interview_raw.mp4'],
-  ['Duration',   '1:03:14'],
-  ['Resolution', '1920 × 1080'],
-  ['Frame rate', '23.976 fps'],
-  ['Codec',      'H.264'],
-  ['Audio',      '48 kHz stereo'],
-]

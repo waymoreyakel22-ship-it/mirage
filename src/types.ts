@@ -6,3 +6,4 @@ export type BinView    = 'grid' | 'list'
 
 export type Folder = { id: string; name: string; locked: boolean }
 export type Asset  = { id: string; name: string; kind: Kind; sub: string; folderId?: string }
+export type Clip   = { id: string; left: number; width: number; label: string }

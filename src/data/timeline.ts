@@ -1,10 +1,10 @@
 import type { Tool } from '../types'
 
 export const TRACKS = [
-  { id: 'v2', label: 'V2', color: '#5E8B7E' },
-  { id: 'v1', label: 'V1', color: '#7079A8' },
-  { id: 'a1', label: 'A1', color: '#9A8662' },
-  { id: 'a2', label: 'A2', color: '#9B6B7D' },
+  { id: 'v2', label: 'V2', color: '#5E8B7E', accepts: 'video' },
+  { id: 'v1', label: 'V1', color: '#7079A8', accepts: 'video' },
+  { id: 'a1', label: 'A1', color: '#9A8662', accepts: 'music' },
+  { id: 'a2', label: 'A2', color: '#9B6B7D', accepts: 'music' },
 ] as const
 
 export const CLIPS: Record<string, { left: number; width: number; label: string }[]> = {

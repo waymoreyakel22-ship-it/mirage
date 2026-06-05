@@ -1,5 +1,43 @@
 # Mirage — dev log
 
+## 2026-06-05 — Phase 2 begins
+
+Phase 2 (functionality) authorized. Also pushed Phase 1 to GitHub:
+`github.com/waymoreyakel22-ship-it/mirage` (public, branch `main`).
+
+### Preview transport relocation
+- Moved transport controls out of the top bar to a centered row directly below the
+  preview screen. Top bar now holds only the timecode (right-aligned).
+- Replaced unicode media glyphs (rendered as blue emoji on Windows) with inline
+  monochrome SVG icons using `fill: currentColor` — color `#444444`, play larger.
+
+### Media pool → timeline drag and drop
+- Bin items are `draggable`; on dragstart the asset JSON rides in `application/json`
+  and its kind rides in a custom MIME type (`application/x-mirage-<kind>`) so drop
+  targets can read kind during dragover (when getData is blocked).
+- Tracks carry `accepts` ('video' for V1/V2, 'music' for A1/A2).
+- Valid track → 1px `#7B6EF6` inset highlight; wrong type → red tint + reject
+  (`dropEffect='none'`, no preventDefault). Source dims to 0.4 while dragging.
+- Drop computes position from cursor X, snaps to nearest second.
+
+### Clips as objects: select / move / delete
+- `useTimeline` hook owns clip state + all interaction logic (Timeline.tsx is
+  presentational again).
+- Click selects (1px accent ring). Drag within a track moves via pointer events
+  (separate from native DnD); live-follows cursor, snaps to second on release.
+- Delete/Backspace removes selected clip (ignored while typing in a field).
+
+### Selection context + Clip Info wiring
+- Minimal `context/SelectionContext.tsx` — just `selectedClip` + `setSelectedClip`.
+- Inspector Clip Info tab now shows live derived metadata (File/Track/Type/In/
+  Duration) or a "No clip selected" empty state. Removed static `CLIP_META`.
+
+### Accent rule clarification
+- Transient interaction states (drop-valid highlight, selection ring) use `#7B6EF6`
+  and do NOT count against the 4 persistent-spot cap.
+
+Note: clips are in-memory only — no persistence yet (resets on refresh).
+
 ## 2026-06-04 (gate) — Phase 1 complete
 
 Final Phase 1 gate adjustments (build clean, CSS bundle ~13.7 kB):

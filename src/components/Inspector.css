@@ -125,6 +125,11 @@
 }
 
 /* Clip info */
+.inspector-empty {
+  font-size: 10px;
+  color: #333;
+  padding: 2px 0;
+}
 .meta-rows { display: flex; flex-direction: column; }
 .meta-row {
   display: flex;

@@ -17,3 +17,15 @@ export function formatSize(bytes: number): string {
   if (bytes < 1048576) return `${Math.round(bytes / 1024)} KB`
   return `${(bytes / 1048576).toFixed(1)} MB`
 }
+
+/** "m:ss" or "h:mm" → seconds; NaN if not a clock value (e.g. "48 KB"). */
+export function parseClockToSeconds(value: string): number {
+  const m = /^(\d+):(\d{1,2})$/.exec(value.trim())
+  return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : NaN
+}
+
+/** seconds → "m:ss" */
+export function formatTimecode(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}

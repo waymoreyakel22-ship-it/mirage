@@ -1,3 +1,4 @@
+import type { DragEvent } from 'react'
 import { ASSET_ICONS } from '../data/media'
 import { useMediaBin } from '../hooks/useMediaBin'
 import type { Asset } from '../types'
@@ -63,11 +64,28 @@ export function MediaBin() {
             <div className="bin-empty">No media — right-click to import</div>
           ) : bin.binView === 'grid' ? (
             <div className="bin-grid">
-              {bin.visibleAssets.map(a => <BinItem key={a.id} asset={a} />)}
+              {bin.visibleAssets.map(a => (
+                <BinItem
+                  key={a.id}
+                  asset={a}
+                  dragging={bin.draggingId === a.id}
+                  onDragStart={bin.onAssetDragStart}
+                  onDragEnd={bin.onAssetDragEnd}
+                />
+              ))}
             </div>
           ) : (
             <div className="bin-listview">
-              {bin.visibleAssets.map(a => <BinItem key={a.id} asset={a} list />)}
+              {bin.visibleAssets.map(a => (
+                <BinItem
+                  key={a.id}
+                  asset={a}
+                  list
+                  dragging={bin.draggingId === a.id}
+                  onDragStart={bin.onAssetDragStart}
+                  onDragEnd={bin.onAssetDragEnd}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -85,28 +103,39 @@ export function MediaBin() {
   )
 }
 
-function BinItem({ asset, list }: { asset: Asset; list?: boolean }) {
+type BinItemProps = {
+  asset: Asset
+  list?: boolean
+  dragging: boolean
+  onDragStart: (e: DragEvent, asset: Asset) => void
+  onDragEnd: () => void
+}
+
+function BinItem({ asset, list, dragging, onDragStart, onDragEnd }: BinItemProps) {
   const thumb = (
     <div className="bin-thumb">
       <span className="bin-thumb-icon">{ASSET_ICONS[asset.kind]}</span>
     </div>
   )
-  if (list) {
-    return (
-      <div className="bin-item">
-        {thumb}
+  return (
+    <div
+      className={`bin-item${dragging ? ' dragging' : ''}`}
+      draggable
+      onDragStart={e => onDragStart(e, asset)}
+      onDragEnd={onDragEnd}
+    >
+      {thumb}
+      {list ? (
         <div className="bin-text">
           <div className="bin-name">{asset.name}</div>
           <div className="bin-sub">{asset.sub}</div>
         </div>
-      </div>
-    )
-  }
-  return (
-    <div className="bin-item">
-      {thumb}
-      <div className="bin-name">{asset.name}</div>
-      <div className="bin-sub">{asset.sub}</div>
+      ) : (
+        <>
+          <div className="bin-name">{asset.name}</div>
+          <div className="bin-sub">{asset.sub}</div>
+        </>
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { DEFAULT_FOLDERS, INITIAL_MEDIA } from '../data/media'
 import { formatSize, kindFromName } from '../lib/format'
 import type { Asset, BinView, Folder } from '../types'
@@ -15,6 +15,7 @@ export function useMediaBin() {
   const [renamingId, setRenamingId]     = useState<string | null>(null)
   const [renameValue, setRenameValue]   = useState('')
   const [menu, setMenu]                 = useState<{ x: number; y: number } | null>(null)
+  const [draggingId, setDraggingId]     = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -73,11 +74,25 @@ export function useMediaBin() {
     setRenameValue(folder.name)
   }
 
+  // The asset payload rides in application/json; its kind also rides in a custom
+  // MIME type so drop targets can read it during dragover (when getData is blocked).
+  function onAssetDragStart(e: ReactDragEvent, asset: Asset) {
+    e.dataTransfer.effectAllowed = 'copy'
+    e.dataTransfer.setData('application/json', JSON.stringify(asset))
+    e.dataTransfer.setData(`application/x-mirage-${asset.kind}`, '1')
+    setDraggingId(asset.id)
+  }
+
+  function onAssetDragEnd() {
+    setDraggingId(null)
+  }
+
   return {
     folders, visibleAssets, binView, setBinView,
     activeFolderId, setActiveFolder,
     renamingId, renameValue, setRenameValue, commitRename, startRename, setRenamingId,
     menu, openMenu, newFolder, importFiles,
     fileInputRef, onFilesPicked,
+    draggingId, onAssetDragStart, onAssetDragEnd,
   }
 }

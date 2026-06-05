@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { CLIPS, RULER_MARKS, TOOLS, TRACKS } from '../data/timeline'
+import { RULER_MARKS, TOOLS, TRACKS } from '../data/timeline'
+import { useTimeline } from '../hooks/useTimeline'
 import type { Tool } from '../types'
 import './Timeline.css'
 
@@ -7,6 +8,7 @@ const PLAYHEAD = '28%'
 
 export function Timeline() {
   const [activeTool, setActiveTool] = useState<Tool>('select')
+  const tl = useTimeline()
 
   return (
     <>
@@ -51,24 +53,36 @@ export function Timeline() {
 
           <div className="track-lanes">
             <div className="playhead-line" style={{ left: PLAYHEAD }} />
-            {TRACKS.map(tr => (
-              <div key={tr.id} className="track-lane">
-                {(CLIPS[tr.id] ?? []).map(clip => (
-                  <div
-                    key={clip.label + clip.left}
-                    className="clip"
-                    style={{
-                      left: `${clip.left}%`,
-                      width: `${clip.width}%`,
-                      borderLeftColor: tr.color,
-                      background: `${tr.color}18`,
-                    }}
-                  >
-                    <span className="clip-label">{clip.label}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
+            {TRACKS.map(tr => {
+              const active = tl.dropTarget?.id === tr.id ? tl.dropTarget : null
+              const state = active ? (active.valid ? ' drop-valid' : ' drop-invalid') : ''
+              return (
+                <div
+                  key={tr.id}
+                  className={`track-lane${state}`}
+                  onMouseDown={e => { if (e.target === e.currentTarget) tl.selectNone() }}
+                  onDragOver={e => tl.onTrackDragOver(e, tr.accepts, tr.id)}
+                  onDragLeave={e => tl.onTrackDragLeave(e, tr.id)}
+                  onDrop={e => tl.onTrackDrop(e, tr.accepts, tr.id)}
+                >
+                  {(tl.clips[tr.id] ?? []).map(clip => (
+                    <div
+                      key={clip.id}
+                      className={`clip${tl.selectedId === clip.id ? ' selected' : ''}`}
+                      style={{
+                        left: `${clip.left}%`,
+                        width: `${clip.width}%`,
+                        borderLeftColor: tr.color,
+                        background: `${tr.color}18`,
+                      }}
+                      onMouseDown={e => tl.beginClipDrag(e, tr.id, clip)}
+                    >
+                      <span className="clip-label">{clip.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>

@@ -135,6 +135,13 @@
 }
 .track-lane:nth-child(odd) { background: rgba(255, 255, 255, 0.008); }
 
+/* Drop feedback — inset shadow avoids any layout shift from a real border */
+.track-lane.drop-valid { box-shadow: inset 0 0 0 1px var(--accent); }
+.track-lane.drop-invalid {
+  box-shadow: inset 0 0 0 1px rgba(229, 72, 72, 0.65);
+  background: rgba(229, 72, 72, 0.08);
+}
+
 .clip {
   position: absolute;
   top: 4px;
@@ -146,10 +153,14 @@
   align-items: center;
   padding: 0 7px;
   overflow: hidden;
-  cursor: pointer;
+  cursor: grab;
   transition: border-color 0.12s, background 0.12s;
 }
 .clip:hover { border-color: rgba(255, 255, 255, 0.18); }
+.clip.selected {
+  box-shadow: 0 0 0 1px var(--accent);
+  z-index: 2;
+}
 .clip-label {
   font-family: var(--mono);
   font-size: 9.5px;

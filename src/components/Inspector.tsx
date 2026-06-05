@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { CLIP_META, FP_STATS, STYLE_PATTERNS, SUGGESTIONS } from '../data/inspector'
+import { FP_STATS, STYLE_PATTERNS, SUGGESTIONS } from '../data/inspector'
+import { useSelection } from '../context/SelectionContext'
+import { formatTimecode } from '../lib/format'
 import type { RightTab } from '../types'
 import './Inspector.css'
 
@@ -9,6 +11,17 @@ const tabLabel = (t: RightTab) =>
 
 export function Inspector() {
   const [tab, setTab] = useState<RightTab>('suggestions')
+  const { selectedClip } = useSelection()
+
+  const clipRows: [string, string][] = selectedClip
+    ? [
+        ['File', selectedClip.name],
+        ['Track', selectedClip.trackLabel],
+        ['Type', selectedClip.kind],
+        ['In', formatTimecode(selectedClip.startSec)],
+        ['Duration', formatTimecode(selectedClip.durationSec)],
+      ]
+    : []
 
   return (
     <aside className="right-panel">
@@ -72,14 +85,18 @@ export function Inspector() {
         {tab === 'clip' && (
           <>
             <p className="section-label">Clip info</p>
-            <div className="meta-rows">
-              {CLIP_META.map(([k, v]) => (
-                <div key={k} className="meta-row">
-                  <span className="meta-key">{k}</span>
-                  <span className="meta-val">{v}</span>
-                </div>
-              ))}
-            </div>
+            {selectedClip ? (
+              <div className="meta-rows">
+                {clipRows.map(([k, v]) => (
+                  <div key={k} className="meta-row">
+                    <span className="meta-key">{k}</span>
+                    <span className="meta-val">{v}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="inspector-empty">No clip selected</div>
+            )}
           </>
         )}
       </div>

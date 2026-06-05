@@ -192,6 +192,8 @@
 .bin-listview .bin-thumb { width: 34px; height: 22px; flex-shrink: 0; }
 .bin-text { display: flex; flex-direction: column; overflow: hidden; }
 
+.bin-item.dragging { opacity: 0.4; }
+
 /* Context menu */
 .ctx-menu {
   position: fixed;
