@@ -11,7 +11,8 @@ complete when every box below is checked.
 - [x] Selection → Clip Info tab (live metadata)
 - [x] Overlap handling (block style) + drop-preview ghost
 - [x] Clip trim/resize — drag edges to change in/out + duration
-- [ ] Ripple / insert mode — neighbours shift instead of block (Ripple tool)
+- [x] Ripple / insert mode — neighbours shift instead of block (Ripple tool)
+- [ ] Cross-layer clip move — drag a clip to another compatible track
 - [ ] Razor / Cut — split a clip at the playhead
 - [ ] Snap (magnet) as a real toggle, not always-on
 - [ ] Zoom in/out — variable timeline scale (currently fixed 30s)
@@ -28,6 +29,19 @@ complete when every box below is checked.
 **Persistence / data**
 - [ ] Persist timeline (localStorage save + rehydrate; resets on refresh now)
 - [ ] Verify media import (+Import / file picker) adds usable assets
+
+## 2026-06-06 — Ripple / insert mode
+
+- Wired to the Ripple tool. Tool state moved from `Timeline.tsx` into
+  `useTimeline` so drop + delete logic can read it.
+- **Insert on drop:** in ripple mode a dropped clip opens space at the insert
+  point and pushes every downstream clip right by its width (`rippleInsertPlan`).
+  Dropping inside a clip lands after it (no split). Rejected if the push would
+  overrun the timeline end; ghost goes red.
+- **Ripple delete:** in ripple mode deleting a clip closes the gap — downstream
+  clips slide left by its width (`rippleClose`), spacing preserved.
+- Select tool keeps block behaviour (drop into gaps, delete leaves a hole).
+- Known gap: ghost shows insert point + length, not the live downstream shift.
 
 ## 2026-06-06 — Clip trim/resize
 

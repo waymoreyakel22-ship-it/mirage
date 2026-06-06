@@ -1,13 +1,10 @@
-import { useState } from 'react'
 import { RULER_MARKS, TOOLS, TRACKS } from '../data/timeline'
 import { useTimeline } from '../hooks/useTimeline'
-import type { Tool } from '../types'
 import './Timeline.css'
 
 const PLAYHEAD = '28%'
 
 export function Timeline() {
-  const [activeTool, setActiveTool] = useState<Tool>('select')
   const tl = useTimeline()
 
   return (
@@ -16,9 +13,9 @@ export function Timeline() {
         {TOOLS.map(t => (
           <button
             key={t.id}
-            className={`tool-btn${activeTool === t.id ? ' active' : ''}`}
+            className={`tool-btn${tl.activeTool === t.id ? ' active' : ''}`}
             title={t.label}
-            onClick={() => setActiveTool(t.id)}
+            onClick={() => tl.setActiveTool(t.id)}
           >
             {t.glyph}
           </button>

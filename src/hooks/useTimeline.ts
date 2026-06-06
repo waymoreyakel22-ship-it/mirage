@@ -3,12 +3,13 @@ import { CLIPS, RULER_MARKS, TRACKS } from '../data/timeline'
 import { clamp, parseClockToSeconds } from '../lib/format'
 import { findSlot, gapAround } from '../lib/overlap'
 import { useSelection, type SelectedClip } from '../context/SelectionContext'
-import type { Asset, Clip } from '../types'
+import type { Asset, Clip, Tool } from '../types'
 
 const TIMELINE_SECONDS = parseClockToSeconds(RULER_MARKS[RULER_MARKS.length - 1])
 const DEFAULT_CLIP_SECONDS = 4
 const MIN_CLIP_SECONDS = 1
 const MIN_WIDTH_PCT = (MIN_CLIP_SECONDS / TIMELINE_SECONDS) * 100
+const EPS = 0.01
 const KIND_PREFIX = 'application/x-mirage-kind-'
 const DUR_PREFIX = 'application/x-mirage-dur-'
 
@@ -51,6 +52,25 @@ function landing(rect: DOMRect, clientX: number, width: number, existing: Clip[]
   return { desiredLeft, placedLeft: findSlot(existing, desiredLeft, width) }
 }
 
+// Ripple/insert: a new clip opens space at the insert point and pushes every
+// downstream clip right by its width. Inserting inside a clip lands after it
+// (no split). `fits` is false when the push would overrun the timeline end.
+function rippleInsertPlan(existing: Clip[], desiredLeft: number, width: number) {
+  const straddler = existing.find(c => c.left < desiredLeft - EPS && c.left + c.width > desiredLeft + EPS)
+  const insertLeft = straddler ? straddler.left + straddler.width : desiredLeft
+  const shifted = existing.map(c => (c.left >= insertLeft - EPS ? { ...c, left: c.left + width } : c))
+  const fits = insertLeft + width <= 100 + EPS && shifted.every(c => c.left + c.width <= 100 + EPS)
+  return { insertLeft, shifted, fits }
+}
+
+// Ripple delete: removing a clip closes the gap — clips after it slide left by
+// the removed clip's width, preserving the spacing between them.
+function rippleClose(trackClips: Clip[], removed: Clip): Clip[] {
+  return trackClips
+    .filter(c => c.id !== removed.id)
+    .map(c => (c.left >= removed.left - EPS ? { ...c, left: c.left - removed.width } : c))
+}
+
 function describe(trackId: string, clip: Clip): SelectedClip {
   const track = TRACKS.find(t => t.id === trackId)
   return {
@@ -68,10 +88,13 @@ export function useTimeline() {
   const [clips, setClips] = useState<Record<string, Clip[]>>(initClips)
   const [dropTarget, setDropTarget] = useState<DropTarget>(null)
   const [ghost, setGhost] = useState<Ghost>(null)
+  const [activeTool, setActiveTool] = useState<Tool>('select')
 
-  // Latest selection, readable inside the once-registered document listeners.
+  // Latest values, readable inside the once-registered document listeners.
   const selectedRef = useRef(selectedClip)
   selectedRef.current = selectedClip
+  const activeToolRef = useRef(activeTool)
+  activeToolRef.current = activeTool
 
   const dragRef = useRef<{
     mode: DragMode
@@ -183,9 +206,17 @@ export function useTimeline() {
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return
       const sel = selectedRef.current
       if (!sel) return
+      const ripple = activeToolRef.current === 'ripple'
       setClips(prev => {
         const out: Record<string, Clip[]> = {}
-        for (const id in prev) out[id] = prev[id].filter(c => c.id !== sel.id)
+        for (const id in prev) {
+          const removed = prev[id].find(c => c.id === sel.id)
+          out[id] = removed
+            ? ripple
+              ? rippleClose(prev[id], removed)
+              : prev[id].filter(c => c.id !== sel.id)
+            : prev[id]
+        }
         return out
       })
       setSelectedClip(null)
@@ -238,18 +269,27 @@ export function useTimeline() {
       return
     }
 
+    const existing = clips[id] ?? []
     const width = durToWidthPct(draggedDuration(e.dataTransfer.types) ?? DEFAULT_CLIP_SECONDS)
-    const { desiredLeft, placedLeft } = landing(
-      e.currentTarget.getBoundingClientRect(), e.clientX, width, clips[id] ?? [],
-    )
-    const fits = placedLeft !== null
+    const { desiredLeft, placedLeft } = landing(e.currentTarget.getBoundingClientRect(), e.clientX, width, existing)
+
+    // Ripple mode inserts (pushes downstream right); Select mode drops into a gap.
+    let fits: boolean
+    let left: number
+    if (activeTool === 'ripple') {
+      const plan = rippleInsertPlan(existing, desiredLeft, width)
+      fits = plan.fits
+      left = plan.insertLeft
+    } else {
+      fits = placedLeft !== null
+      left = placedLeft ?? clamp(desiredLeft, 0, 100 - width)
+    }
     if (fits) {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
     } else {
       e.dataTransfer.dropEffect = 'none'
     }
-    const left = placedLeft ?? clamp(desiredLeft, 0, 100 - width)
     setGhost(prev =>
       prev && prev.trackId === id && prev.left === left && prev.width === width && prev.fits === fits
         ? prev
@@ -278,13 +318,23 @@ export function useTimeline() {
     }
     if (asset.kind !== accepts) return
 
+    const existing = clips[id] ?? []
     const duration = parseClockToSeconds(asset.sub)
     const width = durToWidthPct(Number.isNaN(duration) ? DEFAULT_CLIP_SECONDS : duration)
-    const { placedLeft } = landing(e.currentTarget.getBoundingClientRect(), e.clientX, width, clips[id] ?? [])
-    if (placedLeft === null) return // track is full — nowhere to land this clip
+    const { desiredLeft, placedLeft } = landing(e.currentTarget.getBoundingClientRect(), e.clientX, width, existing)
 
+    if (activeTool === 'ripple') {
+      const plan = rippleInsertPlan(existing, desiredLeft, width)
+      if (!plan.fits) return // insert would overrun the timeline end
+      const clip: Clip = { id: crypto.randomUUID(), left: plan.insertLeft, width, label: asset.name }
+      setClips(prev => ({ ...prev, [id]: [...plan.shifted, clip] }))
+      setSelectedClip(describe(id, clip))
+      return
+    }
+
+    if (placedLeft === null) return // track is full — nowhere to land this clip
     const clip: Clip = { id: crypto.randomUUID(), left: placedLeft, width, label: asset.name }
-    setClips(prev => ({ ...prev, [id]: [...(prev[id] ?? []), clip] }))
+    setClips(prev => ({ ...prev, [id]: [...existing, clip] }))
     setSelectedClip(describe(id, clip))
   }
 
@@ -292,6 +342,8 @@ export function useTimeline() {
     clips,
     dropTarget,
     ghost,
+    activeTool,
+    setActiveTool,
     selectedId: selectedClip?.id ?? null,
     beginClipDrag,
     beginClipResize,
