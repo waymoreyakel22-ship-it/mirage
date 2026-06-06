@@ -12,7 +12,8 @@ complete when every box below is checked.
 - [x] Overlap handling (block style) + drop-preview ghost
 - [x] Clip trim/resize — drag edges to change in/out + duration
 - [x] Ripple / insert mode — neighbours shift instead of block (Ripple tool)
-- [ ] Cross-layer clip move — drag a clip to another compatible track
+- [x] Cross-layer clip move — drag a clip to another compatible track
+- [ ] Alignment aids — snap-to-edge dotted guides + origin ghost while moving
 - [ ] Razor / Cut — split a clip at the playhead
 - [ ] Snap (magnet) as a real toggle, not always-on
 - [ ] Zoom in/out — variable timeline scale (currently fixed 30s)
@@ -29,6 +30,16 @@ complete when every box below is checked.
 **Persistence / data**
 - [ ] Persist timeline (localStorage save + rehydrate; resets on refresh now)
 - [ ] Verify media import (+Import / file picker) adds usable assets
+
+## 2026-06-06 — Cross-layer clip move
+
+- A move-drag can now change lanes: it snapshots each lane's vertical bounds at
+  grab time and hit-tests the cursor's Y against compatible tracks (video →
+  V1/V2, audio → A1/A2). Incompatible lanes are ignored (clip stays put).
+- Horizontal placement reuses `findSlot`, so cross-track lands obey the same
+  no-overlap rule; `relocate()` moves the clip between track arrays.
+- Behaviour shift: move now uses nearest-free-slot instead of clamp-to-gap, so a
+  clip dragged past a neighbour hops to the nearest open gap. Resize unchanged.
 
 ## 2026-06-06 — Ripple / insert mode
 

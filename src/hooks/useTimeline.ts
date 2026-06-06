@@ -71,6 +71,21 @@ function rippleClose(trackClips: Clip[], removed: Clip): Clip[] {
     .map(c => (c.left >= removed.left - EPS ? { ...c, left: c.left - removed.width } : c))
 }
 
+// Move a clip (by id) to `targetTrack` at `left`, removing it from whatever
+// track it currently lives on. Used by cross-layer dragging.
+function relocate(clips: Record<string, Clip[]>, clipId: string, targetTrack: string, left: number) {
+  let moved: Clip | undefined
+  const out: Record<string, Clip[]> = {}
+  for (const t in clips) {
+    const found = clips[t].find(c => c.id === clipId)
+    if (found) moved = found
+    out[t] = clips[t].filter(c => c.id !== clipId)
+  }
+  if (!moved) return clips
+  out[targetTrack] = [...(out[targetTrack] ?? []), { ...moved, left }]
+  return out
+}
+
 function describe(trackId: string, clip: Clip): SelectedClip {
   const track = TRACKS.find(t => t.id === trackId)
   return {
@@ -95,11 +110,14 @@ export function useTimeline() {
   selectedRef.current = selectedClip
   const activeToolRef = useRef(activeTool)
   activeToolRef.current = activeTool
+  const clipsRef = useRef(clips)
+  clipsRef.current = clips
 
   const dragRef = useRef<{
     mode: DragMode
     trackId: string
     clipId: string
+    label: string
     startX: number
     laneWidth: number
     gapStart: number
@@ -109,6 +127,10 @@ export function useTimeline() {
     left: number
     width: number
     moved: boolean
+    // Move-only: where the clip can change lanes.
+    kind: string
+    currentTrack: string
+    lanes: { id: string; accepts: string; rect: DOMRect }[]
   } | null>(null)
 
   // Geometry for a drag at a given cursor delta. Move slides within the gap;
@@ -128,12 +150,35 @@ export function useTimeline() {
     return { left, width: right - left }
   }
 
-  // Pointer-based clip move/resize within its track. Live edges are unsnapped
-  // for smoothness; the moving edge snaps to the nearest second on release.
+  // Pointer-based clip move/resize. Live edges are unsnapped for smoothness; the
+  // moving edge snaps to the nearest second on release. Move can change lanes
+  // (compatible tracks only); resize stays on its track.
   useEffect(() => {
+    // Cursor Y → compatible target lane; horizontal X → nearest free slot there.
+    function moveTick(d: NonNullable<typeof dragRef.current>, e: MouseEvent) {
+      const deltaPct = ((e.clientX - d.startX) / d.laneWidth) * 100
+      const desired = clamp(d.originLeft + deltaPct, 0, 100 - d.width)
+      const lane = d.lanes.find(
+        l => l.accepts === d.kind && e.clientY >= l.rect.top && e.clientY <= l.rect.bottom,
+      )
+      const targetTrack = lane ? lane.id : d.currentTrack
+      const others = (clipsRef.current[targetTrack] ?? []).filter(c => c.id !== d.clipId)
+      const slot = findSlot(others, desired, d.width)
+      if (slot === null) return // target lane has no room at this position
+      if (targetTrack === d.currentTrack && Math.abs(slot - d.left) < 0.001) return
+      d.moved = true
+      d.currentTrack = targetTrack
+      d.left = slot
+      setClips(prev => relocate(prev, d.clipId, targetTrack, slot))
+    }
+
     function move(e: MouseEvent) {
       const d = dragRef.current
       if (!d) return
+      if (d.mode === 'move') {
+        moveTick(d, e)
+        return
+      }
       d.moved = true
       const deltaPct = ((e.clientX - d.startX) / d.laneWidth) * 100
       const { left, width } = geometry(d, deltaPct)
@@ -152,17 +197,27 @@ export function useTimeline() {
       document.body.style.userSelect = ''
       if (!d.moved) return
 
-      // Snap the edge the user was dragging, then re-derive the other.
+      if (d.mode === 'move') {
+        // Snap, then re-resolve to a free slot in the landing lane.
+        const snapped = snapPctToSecond(d.left)
+        const others = (clipsRef.current[d.currentTrack] ?? []).filter(c => c.id !== d.clipId)
+        const left = findSlot(others, snapped, d.width) ?? d.left
+        setClips(prev => relocate(prev, d.clipId, d.currentTrack, left))
+        if (selectedRef.current?.id === d.clipId) {
+          setSelectedClip(describe(d.currentTrack, { id: d.clipId, left, width: d.width, label: d.label }))
+        }
+        return
+      }
+
+      // Resize: snap the edge the user was dragging, then re-derive the other.
       let left = d.left
       let width = d.width
       if (d.mode === 'resize-r') {
         const right = clamp(snapPctToSecond(d.left + d.width), d.left + MIN_WIDTH_PCT, d.gapEnd)
         width = right - d.left
-      } else if (d.mode === 'resize-l') {
+      } else {
         left = clamp(snapPctToSecond(d.left), d.gapStart, d.left + d.width - MIN_WIDTH_PCT)
         width = d.left + d.width - left
-      } else {
-        left = clamp(snapPctToSecond(d.left), d.gapStart, d.gapEnd - d.width)
       }
       setClips(prev => ({
         ...prev,
@@ -232,10 +287,19 @@ export function useTimeline() {
     if (!lane) return
     const others = (clips[trackId] ?? []).filter(c => c.id !== clip.id)
     const { start, end } = gapAround(others, clip)
+    // Snapshot every lane's vertical bounds so a move can hit-test the cursor
+    // against compatible tracks (lanes don't move during a drag).
+    const laneEls = Array.from(lane.parentElement?.querySelectorAll('.track-lane') ?? [])
+    const lanes = laneEls.map((el, i) => ({
+      id: TRACKS[i].id,
+      accepts: TRACKS[i].accepts,
+      rect: el.getBoundingClientRect(),
+    }))
     dragRef.current = {
       mode,
       trackId,
       clipId: clip.id,
+      label: clip.label,
       startX: e.clientX,
       laneWidth: lane.getBoundingClientRect().width,
       gapStart: start,
@@ -245,6 +309,9 @@ export function useTimeline() {
       left: clip.left,
       width: clip.width,
       moved: false,
+      kind: TRACKS.find(t => t.id === trackId)?.accepts ?? '',
+      currentTrack: trackId,
+      lanes,
     }
     document.body.style.cursor = mode === 'move' ? 'grabbing' : 'ew-resize'
     document.body.style.userSelect = 'none'
