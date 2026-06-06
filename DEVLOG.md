@@ -1,5 +1,30 @@
 # Mirage — dev log
 
+## 2026-06-06 — Overlap handling + drop-preview ghost
+
+### Overlap handling (block style, Select tool)
+- Clips can no longer stack on a track. New pure-function module `lib/overlap.ts`
+  (`overlaps`, `moveBounds`, `findSlot`) holds the percent-space geometry.
+- **Move:** a dragged clip is clamped to its current gap — it slides until it
+  butts against the nearest neighbour and can't jump past one. Bounds are
+  computed once at drag start (`moveBounds`) and stored on the move ref.
+- **Drop:** a new clip routes through `findSlot` and lands in the nearest free
+  gap to the cursor; if no gap fits the clip's width, the drop is rejected.
+- Ripple/insert behaviour deferred — would tie to the Ripple tool later.
+
+### Drop-preview ghost
+- Dragging a media-pool asset over a track now shows a transparent dashed ghost
+  sized to the asset's real duration, snapped to the second and resolved to the
+  actual landing gap (preview == result; shared `landing()` helper).
+- Duration rides in a second custom MIME name (`application/x-mirage-dur-<sec>`)
+  set at dragstart, readable during dragover. Kind marker renamed to
+  `application/x-mirage-kind-<kind>` so the two prefixes don't collide.
+- Ghost + lane go red when the track has no room or the kind is wrong.
+
+### Fixed
+- Full / occupied track no longer shows a false-valid (green) highlight. Drag
+  validity is now `fits = findSlot(...) !== null`, not just a kind match.
+
 ## 2026-06-05 — Phase 2 begins
 
 Phase 2 (functionality) authorized. Also pushed Phase 1 to GitHub:

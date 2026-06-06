@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { DEFAULT_FOLDERS, INITIAL_MEDIA } from '../data/media'
-import { formatSize, kindFromName } from '../lib/format'
+import { formatSize, kindFromName, parseClockToSeconds } from '../lib/format'
 import type { Asset, BinView, Folder } from '../types'
 
 const isDefaultFolder = (id: string) => DEFAULT_FOLDERS.some(f => f.id === id)
@@ -74,12 +74,15 @@ export function useMediaBin() {
     setRenameValue(folder.name)
   }
 
-  // The asset payload rides in application/json; its kind also rides in a custom
-  // MIME type so drop targets can read it during dragover (when getData is blocked).
+  // The asset payload rides in application/json; its kind and duration also ride
+  // in custom MIME type names so drop targets can read them during dragover (when
+  // getData is blocked) — the kind gates the track, the duration sizes the ghost.
   function onAssetDragStart(e: ReactDragEvent, asset: Asset) {
     e.dataTransfer.effectAllowed = 'copy'
     e.dataTransfer.setData('application/json', JSON.stringify(asset))
-    e.dataTransfer.setData(`application/x-mirage-${asset.kind}`, '1')
+    e.dataTransfer.setData(`application/x-mirage-kind-${asset.kind}`, '1')
+    const durSec = parseClockToSeconds(asset.sub)
+    if (!Number.isNaN(durSec)) e.dataTransfer.setData(`application/x-mirage-dur-${durSec}`, '1')
     setDraggingId(asset.id)
   }
 

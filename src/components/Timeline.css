@@ -142,6 +142,22 @@
   background: rgba(229, 72, 72, 0.08);
 }
 
+/* Drop preview — shows the dragged clip's length and snapped landing spot */
+.clip-ghost {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 2px;
+  border: 1px dashed var(--accent);
+  background: rgba(123, 110, 246, 0.08);
+  pointer-events: none;
+  z-index: 1;
+}
+.clip-ghost.no-fit {
+  border-color: rgba(229, 72, 72, 0.7);
+  background: rgba(229, 72, 72, 0.08);
+}
+
 .clip {
   position: absolute;
   top: 4px;

@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { CLIPS, RULER_MARKS, TRACKS } from '../data/timeline'
 import { clamp, parseClockToSeconds } from '../lib/format'
+import { findSlot, moveBounds } from '../lib/overlap'
 import { useSelection, type SelectedClip } from '../context/SelectionContext'
 import type { Asset, Clip } from '../types'
 
 const TIMELINE_SECONDS = parseClockToSeconds(RULER_MARKS[RULER_MARKS.length - 1])
 const DEFAULT_CLIP_SECONDS = 4
-const MIRAGE_PREFIX = 'application/x-mirage-'
+const KIND_PREFIX = 'application/x-mirage-kind-'
+const DUR_PREFIX = 'application/x-mirage-dur-'
 
 export type DropTarget = { id: string; valid: boolean } | null
+export type Ghost = { trackId: string; left: number; width: number; fits: boolean } | null
 
 function initClips(): Record<string, Clip[]> {
   const out: Record<string, Clip[]> = {}
@@ -17,13 +20,32 @@ function initClips(): Record<string, Clip[]> {
 }
 
 function draggedKind(types: readonly string[]): string | null {
-  const marker = types.find(t => t.startsWith(MIRAGE_PREFIX))
-  return marker ? marker.slice(MIRAGE_PREFIX.length) : null
+  const marker = types.find(t => t.startsWith(KIND_PREFIX))
+  return marker ? marker.slice(KIND_PREFIX.length) : null
+}
+
+function draggedDuration(types: readonly string[]): number | null {
+  const marker = types.find(t => t.startsWith(DUR_PREFIX))
+  if (!marker) return null
+  const sec = Number(marker.slice(DUR_PREFIX.length))
+  return Number.isFinite(sec) && sec > 0 ? sec : null
 }
 
 const snapPctToSecond = (pct: number) => {
   const sec = clamp(Math.round((pct / 100) * TIMELINE_SECONDS), 0, TIMELINE_SECONDS)
   return (sec / TIMELINE_SECONDS) * 100
+}
+
+const durToWidthPct = (durSec: number) =>
+  (clamp(durSec, 1, TIMELINE_SECONDS) / TIMELINE_SECONDS) * 100
+
+// Where a width-wide clip would land if dropped at the cursor: the cursor X
+// snapped to the nearest second, then resolved to the closest free gap.
+function landing(rect: DOMRect, clientX: number, width: number, existing: Clip[]) {
+  const ratio = (clientX - rect.left) / rect.width
+  const startSec = clamp(Math.round(ratio * TIMELINE_SECONDS), 0, TIMELINE_SECONDS)
+  const desiredLeft = (startSec / TIMELINE_SECONDS) * 100
+  return { desiredLeft, placedLeft: findSlot(existing, desiredLeft, width) }
 }
 
 function describe(trackId: string, clip: Clip): SelectedClip {
@@ -42,6 +64,7 @@ export function useTimeline() {
   const { selectedClip, setSelectedClip } = useSelection()
   const [clips, setClips] = useState<Record<string, Clip[]>>(initClips)
   const [dropTarget, setDropTarget] = useState<DropTarget>(null)
+  const [ghost, setGhost] = useState<Ghost>(null)
 
   // Latest selection, readable inside the once-registered document listeners.
   const selectedRef = useRef(selectedClip)
@@ -54,7 +77,8 @@ export function useTimeline() {
     laneWidth: number
     originLeft: number
     currentLeft: number
-    width: number
+    minLeft: number
+    maxLeft: number
     moved: boolean
   } | null>(null)
 
@@ -66,7 +90,7 @@ export function useTimeline() {
       if (!m) return
       m.moved = true
       const deltaPct = ((e.clientX - m.startX) / m.laneWidth) * 100
-      const left = clamp(m.originLeft + deltaPct, 0, 100 - m.width)
+      const left = clamp(m.originLeft + deltaPct, m.minLeft, m.maxLeft)
       m.currentLeft = left
       setClips(prev => ({
         ...prev,
@@ -80,7 +104,7 @@ export function useTimeline() {
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
       if (!m.moved) return
-      const snapped = clamp(snapPctToSecond(m.currentLeft), 0, 100 - m.width)
+      const snapped = clamp(snapPctToSecond(m.currentLeft), m.minLeft, m.maxLeft)
       setClips(prev => ({
         ...prev,
         [m.trackId]: prev[m.trackId].map(c => (c.id === m.clipId ? { ...c, left: snapped } : c)),
@@ -97,9 +121,12 @@ export function useTimeline() {
     }
   }, [setSelectedClip])
 
-  // A drop outside any lane (or a cancelled drag) still needs the highlight cleared.
+  // A drop outside any lane (or a cancelled drag) still needs the feedback cleared.
   useEffect(() => {
-    const clear = () => setDropTarget(null)
+    const clear = () => {
+      setDropTarget(null)
+      setGhost(null)
+    }
     window.addEventListener('dragend', clear)
     window.addEventListener('drop', clear)
     return () => {
@@ -132,6 +159,8 @@ export function useTimeline() {
     setSelectedClip(describe(trackId, clip))
     const lane = e.currentTarget.parentElement
     if (!lane) return
+    const others = (clips[trackId] ?? []).filter(c => c.id !== clip.id)
+    const { min, max } = moveBounds(others, clip)
     moveRef.current = {
       trackId,
       clipId: clip.id,
@@ -139,7 +168,8 @@ export function useTimeline() {
       laneWidth: lane.getBoundingClientRect().width,
       originLeft: clip.left,
       currentLeft: clip.left,
-      width: clip.width,
+      minLeft: min,
+      maxLeft: max,
       moved: false,
     }
     document.body.style.cursor = 'grabbing'
@@ -151,24 +181,45 @@ export function useTimeline() {
   function onTrackDragOver(e: ReactDragEvent<HTMLDivElement>, accepts: string, id: string) {
     const kind = draggedKind(e.dataTransfer.types)
     if (!kind) return
-    const valid = kind === accepts
-    if (valid) {
+
+    // Wrong track type: reject outright, no preview ghost.
+    if (kind !== accepts) {
+      e.dataTransfer.dropEffect = 'none'
+      setGhost(null)
+      setDropTarget(prev => (prev?.id === id && !prev.valid ? prev : { id, valid: false }))
+      return
+    }
+
+    const width = durToWidthPct(draggedDuration(e.dataTransfer.types) ?? DEFAULT_CLIP_SECONDS)
+    const { desiredLeft, placedLeft } = landing(
+      e.currentTarget.getBoundingClientRect(), e.clientX, width, clips[id] ?? [],
+    )
+    const fits = placedLeft !== null
+    if (fits) {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
     } else {
       e.dataTransfer.dropEffect = 'none'
     }
-    setDropTarget(prev => (prev?.id === id && prev.valid === valid ? prev : { id, valid }))
+    const left = placedLeft ?? clamp(desiredLeft, 0, 100 - width)
+    setGhost(prev =>
+      prev && prev.trackId === id && prev.left === left && prev.width === width && prev.fits === fits
+        ? prev
+        : { trackId: id, left, width, fits },
+    )
+    setDropTarget(prev => (prev?.id === id && prev.valid === fits ? prev : { id, valid: fits }))
   }
 
   function onTrackDragLeave(e: ReactDragEvent<HTMLDivElement>, id: string) {
     if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
     setDropTarget(prev => (prev?.id === id ? null : prev))
+    setGhost(prev => (prev?.trackId === id ? null : prev))
   }
 
   function onTrackDrop(e: ReactDragEvent<HTMLDivElement>, accepts: string, id: string) {
     e.preventDefault()
     setDropTarget(null)
+    setGhost(null)
     const raw = e.dataTransfer.getData('application/json')
     if (!raw) return
     let asset: Asset
@@ -179,21 +230,12 @@ export function useTimeline() {
     }
     if (asset.kind !== accepts) return
 
-    const rect = e.currentTarget.getBoundingClientRect()
-    const ratio = (e.clientX - rect.left) / rect.width
-    const startSec = clamp(Math.round(ratio * TIMELINE_SECONDS), 0, TIMELINE_SECONDS)
     const duration = parseClockToSeconds(asset.sub)
-    const widthSec = clamp(
-      Number.isNaN(duration) ? DEFAULT_CLIP_SECONDS : duration,
-      1,
-      Math.max(1, TIMELINE_SECONDS - startSec),
-    )
-    const clip: Clip = {
-      id: crypto.randomUUID(),
-      left: (startSec / TIMELINE_SECONDS) * 100,
-      width: (widthSec / TIMELINE_SECONDS) * 100,
-      label: asset.name,
-    }
+    const width = durToWidthPct(Number.isNaN(duration) ? DEFAULT_CLIP_SECONDS : duration)
+    const { placedLeft } = landing(e.currentTarget.getBoundingClientRect(), e.clientX, width, clips[id] ?? [])
+    if (placedLeft === null) return // track is full — nowhere to land this clip
+
+    const clip: Clip = { id: crypto.randomUUID(), left: placedLeft, width, label: asset.name }
     setClips(prev => ({ ...prev, [id]: [...(prev[id] ?? []), clip] }))
     setSelectedClip(describe(id, clip))
   }
@@ -201,6 +243,7 @@ export function useTimeline() {
   return {
     clips,
     dropTarget,
+    ghost,
     selectedId: selectedClip?.id ?? null,
     beginClipDrag,
     selectNone,

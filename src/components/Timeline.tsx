@@ -65,6 +65,12 @@ export function Timeline() {
                   onDragLeave={e => tl.onTrackDragLeave(e, tr.id)}
                   onDrop={e => tl.onTrackDrop(e, tr.accepts, tr.id)}
                 >
+                  {tl.ghost?.trackId === tr.id && (
+                    <div
+                      className={`clip-ghost${tl.ghost.fits ? '' : ' no-fit'}`}
+                      style={{ left: `${tl.ghost.left}%`, width: `${tl.ghost.width}%` }}
+                    />
+                  )}
                   {(tl.clips[tr.id] ?? []).map(clip => (
                     <div
                       key={clip.id}
