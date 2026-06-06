@@ -1,5 +1,45 @@
 # Mirage — dev log
 
+## Phase 2 checklist (functionality)
+
+Living tracker for Phase 2 — the shell becomes a working editor. Phase 2 is
+complete when every box below is checked.
+
+**Timeline / clips**
+- [x] Drag-and-drop media pool → timeline (kind-gated V/A tracks)
+- [x] Clip select / move / delete
+- [x] Selection → Clip Info tab (live metadata)
+- [x] Overlap handling (block style) + drop-preview ghost
+- [x] Clip trim/resize — drag edges to change in/out + duration
+- [ ] Ripple / insert mode — neighbours shift instead of block (Ripple tool)
+- [ ] Razor / Cut — split a clip at the playhead
+- [ ] Snap (magnet) as a real toggle, not always-on
+- [ ] Zoom in/out — variable timeline scale (currently fixed 30s)
+
+**Playback / playhead**
+- [ ] Play/pause — wire transport, running timecode
+- [ ] Scrubbing — draggable playhead + click-to-seek (currently static 28%)
+- [ ] Top-bar timecode reflects playhead position
+
+**AI / right panel**
+- [ ] AI thoughts panel trigger (built, never surfaced)
+- [ ] Suggestions are interactive (click → jump/apply), not static mock
+
+**Persistence / data**
+- [ ] Persist timeline (localStorage save + rehydrate; resets on refresh now)
+- [ ] Verify media import (+Import / file picker) adds usable assets
+
+## 2026-06-06 — Clip trim/resize
+
+- Drag a clip's left edge to set the in point (right edge anchored) or the right
+  edge to set the out point / duration (left anchored). Snaps to the second on
+  release; Clip Info In/Duration update live.
+- Move + both resizes unified into one drag path: `geometry()` computes left/width
+  per mode, `gapAround()` (in `lib/overlap.ts`) gives the free span. Trimming
+  obeys the same overlap rules as moving and can't shrink below 1s.
+- 6px invisible edge hit-zones with a faint grip line on hover; handles
+  `stopPropagation` so an edge resizes instead of moving the whole clip.
+
 ## 2026-06-06 — Overlap handling + drop-preview ghost
 
 ### Overlap handling (block style, Select tool)

@@ -83,7 +83,15 @@ export function Timeline() {
                       }}
                       onMouseDown={e => tl.beginClipDrag(e, tr.id, clip)}
                     >
+                      <div
+                        className="clip-handle left"
+                        onMouseDown={e => tl.beginClipResize(e, tr.id, clip, 'l')}
+                      />
                       <span className="clip-label">{clip.label}</span>
+                      <div
+                        className="clip-handle right"
+                        onMouseDown={e => tl.beginClipResize(e, tr.id, clip, 'r')}
+                      />
                     </div>
                   ))}
                 </div>

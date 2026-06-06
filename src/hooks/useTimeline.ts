@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { CLIPS, RULER_MARKS, TRACKS } from '../data/timeline'
 import { clamp, parseClockToSeconds } from '../lib/format'
-import { findSlot, moveBounds } from '../lib/overlap'
+import { findSlot, gapAround } from '../lib/overlap'
 import { useSelection, type SelectedClip } from '../context/SelectionContext'
 import type { Asset, Clip } from '../types'
 
 const TIMELINE_SECONDS = parseClockToSeconds(RULER_MARKS[RULER_MARKS.length - 1])
 const DEFAULT_CLIP_SECONDS = 4
+const MIN_CLIP_SECONDS = 1
+const MIN_WIDTH_PCT = (MIN_CLIP_SECONDS / TIMELINE_SECONDS) * 100
 const KIND_PREFIX = 'application/x-mirage-kind-'
 const DUR_PREFIX = 'application/x-mirage-dur-'
 
+export type DragMode = 'move' | 'resize-l' | 'resize-r'
 export type DropTarget = { id: string; valid: boolean } | null
 export type Ghost = { trackId: string; left: number; width: number; fits: boolean } | null
 
@@ -70,47 +73,84 @@ export function useTimeline() {
   const selectedRef = useRef(selectedClip)
   selectedRef.current = selectedClip
 
-  const moveRef = useRef<{
+  const dragRef = useRef<{
+    mode: DragMode
     trackId: string
     clipId: string
     startX: number
     laneWidth: number
+    gapStart: number
+    gapEnd: number
     originLeft: number
-    currentLeft: number
-    minLeft: number
-    maxLeft: number
+    originWidth: number
+    left: number
+    width: number
     moved: boolean
   } | null>(null)
 
-  // Pointer-based clip move within its track. Live position is unsnapped for
-  // smoothness; it snaps to the nearest second on release.
+  // Geometry for a drag at a given cursor delta. Move slides within the gap;
+  // resize-l drags the in point (right edge fixed); resize-r drags the out point
+  // (left edge fixed). All clamp to the gap and a 1s floor.
+  function geometry(d: NonNullable<typeof dragRef.current>, deltaPct: number) {
+    if (d.mode === 'move') {
+      const left = clamp(d.originLeft + deltaPct, d.gapStart, d.gapEnd - d.originWidth)
+      return { left, width: d.originWidth }
+    }
+    if (d.mode === 'resize-r') {
+      const width = clamp(d.originWidth + deltaPct, MIN_WIDTH_PCT, d.gapEnd - d.originLeft)
+      return { left: d.originLeft, width }
+    }
+    const right = d.originLeft + d.originWidth
+    const left = clamp(d.originLeft + deltaPct, d.gapStart, right - MIN_WIDTH_PCT)
+    return { left, width: right - left }
+  }
+
+  // Pointer-based clip move/resize within its track. Live edges are unsnapped
+  // for smoothness; the moving edge snaps to the nearest second on release.
   useEffect(() => {
     function move(e: MouseEvent) {
-      const m = moveRef.current
-      if (!m) return
-      m.moved = true
-      const deltaPct = ((e.clientX - m.startX) / m.laneWidth) * 100
-      const left = clamp(m.originLeft + deltaPct, m.minLeft, m.maxLeft)
-      m.currentLeft = left
+      const d = dragRef.current
+      if (!d) return
+      d.moved = true
+      const deltaPct = ((e.clientX - d.startX) / d.laneWidth) * 100
+      const { left, width } = geometry(d, deltaPct)
+      d.left = left
+      d.width = width
       setClips(prev => ({
         ...prev,
-        [m.trackId]: prev[m.trackId].map(c => (c.id === m.clipId ? { ...c, left } : c)),
+        [d.trackId]: prev[d.trackId].map(c => (c.id === d.clipId ? { ...c, left, width } : c)),
       }))
     }
     function up() {
-      const m = moveRef.current
-      if (!m) return
-      moveRef.current = null
+      const d = dragRef.current
+      if (!d) return
+      dragRef.current = null
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
-      if (!m.moved) return
-      const snapped = clamp(snapPctToSecond(m.currentLeft), m.minLeft, m.maxLeft)
+      if (!d.moved) return
+
+      // Snap the edge the user was dragging, then re-derive the other.
+      let left = d.left
+      let width = d.width
+      if (d.mode === 'resize-r') {
+        const right = clamp(snapPctToSecond(d.left + d.width), d.left + MIN_WIDTH_PCT, d.gapEnd)
+        width = right - d.left
+      } else if (d.mode === 'resize-l') {
+        left = clamp(snapPctToSecond(d.left), d.gapStart, d.left + d.width - MIN_WIDTH_PCT)
+        width = d.left + d.width - left
+      } else {
+        left = clamp(snapPctToSecond(d.left), d.gapStart, d.gapEnd - d.width)
+      }
       setClips(prev => ({
         ...prev,
-        [m.trackId]: prev[m.trackId].map(c => (c.id === m.clipId ? { ...c, left: snapped } : c)),
+        [d.trackId]: prev[d.trackId].map(c => (c.id === d.clipId ? { ...c, left, width } : c)),
       }))
-      if (selectedRef.current?.id === m.clipId) {
-        setSelectedClip({ ...selectedRef.current, startSec: (snapped / 100) * TIMELINE_SECONDS })
+      if (selectedRef.current?.id === d.clipId) {
+        setSelectedClip({
+          ...selectedRef.current,
+          startSec: (left / 100) * TIMELINE_SECONDS,
+          durationSec: (width / 100) * TIMELINE_SECONDS,
+        })
       }
     }
     document.addEventListener('mousemove', move)
@@ -154,27 +194,35 @@ export function useTimeline() {
     return () => window.removeEventListener('keydown', onKey)
   }, [setSelectedClip])
 
-  function beginClipDrag(e: ReactMouseEvent<HTMLDivElement>, trackId: string, clip: Clip) {
+  function beginDrag(e: ReactMouseEvent<HTMLDivElement>, mode: DragMode, trackId: string, clip: Clip) {
     e.stopPropagation()
     setSelectedClip(describe(trackId, clip))
-    const lane = e.currentTarget.parentElement
+    const lane = (e.currentTarget as HTMLElement).closest('.track-lane')
     if (!lane) return
     const others = (clips[trackId] ?? []).filter(c => c.id !== clip.id)
-    const { min, max } = moveBounds(others, clip)
-    moveRef.current = {
+    const { start, end } = gapAround(others, clip)
+    dragRef.current = {
+      mode,
       trackId,
       clipId: clip.id,
       startX: e.clientX,
       laneWidth: lane.getBoundingClientRect().width,
+      gapStart: start,
+      gapEnd: end,
       originLeft: clip.left,
-      currentLeft: clip.left,
-      minLeft: min,
-      maxLeft: max,
+      originWidth: clip.width,
+      left: clip.left,
+      width: clip.width,
       moved: false,
     }
-    document.body.style.cursor = 'grabbing'
+    document.body.style.cursor = mode === 'move' ? 'grabbing' : 'ew-resize'
     document.body.style.userSelect = 'none'
   }
+
+  const beginClipDrag = (e: ReactMouseEvent<HTMLDivElement>, trackId: string, clip: Clip) =>
+    beginDrag(e, 'move', trackId, clip)
+  const beginClipResize = (e: ReactMouseEvent<HTMLDivElement>, trackId: string, clip: Clip, edge: 'l' | 'r') =>
+    beginDrag(e, edge === 'l' ? 'resize-l' : 'resize-r', trackId, clip)
 
   const selectNone = () => setSelectedClip(null)
 
@@ -246,6 +294,7 @@ export function useTimeline() {
     ghost,
     selectedId: selectedClip?.id ?? null,
     beginClipDrag,
+    beginClipResize,
     selectNone,
     onTrackDragOver,
     onTrackDragLeave,

@@ -11,20 +11,20 @@ export const overlaps = (a: Span, b: Span) =>
   a.left + a.width > b.left + EPS && b.left + b.width > a.left + EPS
 
 /**
- * The [min, max] left range a clip may occupy while staying inside the
- * contiguous gap it currently sits in — it can slide until it butts against its
- * nearest neighbour on either side, never jumping past one.
+ * The free gap [start, end] surrounding a clip: from its nearest left
+ * neighbour's right edge to its nearest right neighbour's left edge (clamped to
+ * the track). Both move and resize are constrained to this span.
  */
-export function moveBounds(others: Span[], origin: Span, track = 100): { min: number; max: number } {
+export function gapAround(others: Span[], origin: Span, track = 100): { start: number; end: number } {
   const originRight = origin.left + origin.width
-  let min = 0
-  let max = track - origin.width
+  let start = 0
+  let end = track
   for (const o of others) {
     const oRight = o.left + o.width
-    if (oRight <= origin.left + EPS) min = Math.max(min, oRight)                 // neighbour on the left
-    else if (o.left >= originRight - EPS) max = Math.min(max, o.left - origin.width) // neighbour on the right
+    if (oRight <= origin.left + EPS) start = Math.max(start, oRight)        // neighbour on the left
+    else if (o.left >= originRight - EPS) end = Math.min(end, o.left)        // neighbour on the right
   }
-  return { min, max: Math.max(min, max) }
+  return { start, end: Math.max(end, originRight) }
 }
 
 /**
