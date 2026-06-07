@@ -142,6 +142,34 @@
   background: rgba(229, 72, 72, 0.08);
 }
 
+/* Alignment guide — dotted vertical line at a snapped clip edge */
+.align-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dotted var(--accent);
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 6;
+}
+/* Origin reference lines sit quieter until the clip snaps onto one */
+.align-guide.origin {
+  border-left-color: rgba(123, 110, 246, 0.4);
+  z-index: 5;
+}
+
+/* Origin placeholder — where the clip sat before this move (Filmora-style) */
+.clip-origin {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 2px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+  pointer-events: none;
+}
+
 /* Drop preview — shows the dragged clip's length and snapped landing spot */
 .clip-ghost {
   position: absolute;

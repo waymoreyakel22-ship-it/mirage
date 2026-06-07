@@ -50,6 +50,13 @@ export function Timeline() {
 
           <div className="track-lanes">
             <div className="playhead-line" style={{ left: PLAYHEAD }} />
+            {tl.moveOrigin &&
+              [tl.moveOrigin.left, tl.moveOrigin.left + tl.moveOrigin.width].map((x, i) => (
+                <div key={`origin-${i}`} className="align-guide origin" style={{ left: `${x}%` }} />
+              ))}
+            {tl.guides.map((x, i) => (
+              <div key={i} className="align-guide" style={{ left: `${x}%` }} />
+            ))}
             {TRACKS.map(tr => {
               const active = tl.dropTarget?.id === tr.id ? tl.dropTarget : null
               const state = active ? (active.valid ? ' drop-valid' : ' drop-invalid') : ''
@@ -66,6 +73,12 @@ export function Timeline() {
                     <div
                       className={`clip-ghost${tl.ghost.fits ? '' : ' no-fit'}`}
                       style={{ left: `${tl.ghost.left}%`, width: `${tl.ghost.width}%` }}
+                    />
+                  )}
+                  {tl.moveOrigin?.trackId === tr.id && (
+                    <div
+                      className="clip-origin"
+                      style={{ left: `${tl.moveOrigin.left}%`, width: `${tl.moveOrigin.width}%` }}
                     />
                   )}
                   {(tl.clips[tr.id] ?? []).map(clip => (

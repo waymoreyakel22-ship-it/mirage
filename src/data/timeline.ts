@@ -10,10 +10,10 @@ export const TRACKS = [
 export const CLIPS: Record<string, { left: number; width: number; label: string }[]> = {
   v2: [{ left: 15, width: 18, label: 'Title card' }],
   v1: [
-    { left: 0,  width: 62, label: 'Interview_raw.mp4' },
-    { left: 65, width: 30, label: 'B-roll_park.mp4'  },
+    { left: 0,  width: 45, label: 'Interview_raw.mp4' },
+    { left: 50, width: 30, label: 'B-roll_park.mp4'  },
   ],
-  a1: [{ left: 0, width: 95, label: 'Main_theme.mp3' }],
+  a1: [{ left: 0, width: 60, label: 'Main_theme.mp3' }],
   a2: [
     { left: 20, width: 12, label: 'SFX_whoosh.wav' },
     { left: 50, width:  9, label: 'SFX_whoosh.wav' },

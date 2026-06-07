@@ -86,6 +86,33 @@ function relocate(clips: Record<string, Clip[]>, clipId: string, targetTrack: st
   return out
 }
 
+// Snap candidates while moving: every other clip's edges, plus the timeline ends.
+function clipEdges(clips: Record<string, Clip[]>, exceptId: string): number[] {
+  const out = [0, 100]
+  for (const t in clips) {
+    for (const c of clips[t]) {
+      if (c.id === exceptId) continue
+      out.push(c.left, c.left + c.width)
+    }
+  }
+  return out
+}
+
+// Pull a clip's nearest edge onto the closest candidate within `threshold`.
+// Returns the adjusted left and the candidate x to draw a guide at (or null).
+function alignEdges(left: number, width: number, edges: number[], threshold: number) {
+  let best = { dist: threshold, left, guide: null as number | null }
+  for (const x of edges) {
+    const dl = Math.abs(left - x)
+    if (dl < best.dist) best = { dist: dl, left: x, guide: x }
+    const dr = Math.abs(left + width - x)
+    if (dr < best.dist) best = { dist: dr, left: x - width, guide: x }
+  }
+  return { left: best.left, guide: best.guide }
+}
+
+const sameNums = (a: number[], b: number[]) => a.length === b.length && a.every((n, i) => n === b[i])
+
 function describe(trackId: string, clip: Clip): SelectedClip {
   const track = TRACKS.find(t => t.id === trackId)
   return {
@@ -104,6 +131,9 @@ export function useTimeline() {
   const [dropTarget, setDropTarget] = useState<DropTarget>(null)
   const [ghost, setGhost] = useState<Ghost>(null)
   const [activeTool, setActiveTool] = useState<Tool>('select')
+  // Move-drag alignment aids: vertical guide lines + a placeholder in the source lane.
+  const [guides, setGuides] = useState<number[]>([])
+  const [moveOrigin, setMoveOrigin] = useState<{ trackId: string; left: number; width: number } | null>(null)
 
   // Latest values, readable inside the once-registered document listeners.
   const selectedRef = useRef(selectedClip)
@@ -154,17 +184,30 @@ export function useTimeline() {
   // moving edge snaps to the nearest second on release. Move can change lanes
   // (compatible tracks only); resize stays on its track.
   useEffect(() => {
-    // Cursor Y → compatible target lane; horizontal X → nearest free slot there.
+    // Cursor Y → compatible target lane; horizontal X → snap to nearby clip edges
+    // (drawing guides), else the nearest free slot in that lane.
     function moveTick(d: NonNullable<typeof dragRef.current>, e: MouseEvent) {
+      setMoveOrigin(prev => prev ?? { trackId: d.trackId, left: d.originLeft, width: d.originWidth })
       const deltaPct = ((e.clientX - d.startX) / d.laneWidth) * 100
       const desired = clamp(d.originLeft + deltaPct, 0, 100 - d.width)
+      const threshold = (6 / d.laneWidth) * 100
+      // Snap candidates include the clip's own origin edges, so it can drop back
+      // into the same horizontal position on a different layer.
+      const edges = [...clipEdges(clipsRef.current, d.clipId), d.originLeft, d.originLeft + d.originWidth]
+      const { left: aligned, guide } = alignEdges(desired, d.width, edges, threshold)
+
       const lane = d.lanes.find(
         l => l.accepts === d.kind && e.clientY >= l.rect.top && e.clientY <= l.rect.bottom,
       )
       const targetTrack = lane ? lane.id : d.currentTrack
       const others = (clipsRef.current[targetTrack] ?? []).filter(c => c.id !== d.clipId)
-      const slot = findSlot(others, desired, d.width)
+      const slot = findSlot(others, aligned, d.width)
       if (slot === null) return // target lane has no room at this position
+
+      // Only show a guide when the snap actually landed where it aligned.
+      const snapped = guide !== null && Math.abs(slot - aligned) < 0.001
+      setGuides(prev => (sameNums(prev, snapped ? [guide!] : []) ? prev : snapped ? [guide!] : []))
+
       if (targetTrack === d.currentTrack && Math.abs(slot - d.left) < 0.001) return
       d.moved = true
       d.currentTrack = targetTrack
@@ -195,13 +238,21 @@ export function useTimeline() {
       dragRef.current = null
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
+      if (d.mode === 'move') {
+        setGuides([])
+        setMoveOrigin(null)
+      }
       if (!d.moved) return
 
       if (d.mode === 'move') {
-        // Snap, then re-resolve to a free slot in the landing lane.
-        const snapped = snapPctToSecond(d.left)
+        // Prefer an edge alignment; otherwise snap to the nearest second. Then
+        // re-resolve to a free slot in the landing lane.
+        const threshold = (6 / d.laneWidth) * 100
+        const edges = [...clipEdges(clipsRef.current, d.clipId), d.originLeft, d.originLeft + d.originWidth]
+        const { left: aligned, guide } = alignEdges(d.left, d.width, edges, threshold)
+        const target = guide !== null ? aligned : snapPctToSecond(d.left)
         const others = (clipsRef.current[d.currentTrack] ?? []).filter(c => c.id !== d.clipId)
-        const left = findSlot(others, snapped, d.width) ?? d.left
+        const left = findSlot(others, target, d.width) ?? d.left
         setClips(prev => relocate(prev, d.clipId, d.currentTrack, left))
         if (selectedRef.current?.id === d.clipId) {
           setSelectedClip(describe(d.currentTrack, { id: d.clipId, left, width: d.width, label: d.label }))
@@ -409,6 +460,8 @@ export function useTimeline() {
     clips,
     dropTarget,
     ghost,
+    guides,
+    moveOrigin,
     activeTool,
     setActiveTool,
     selectedId: selectedClip?.id ?? null,

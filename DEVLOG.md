@@ -13,7 +13,7 @@ complete when every box below is checked.
 - [x] Clip trim/resize — drag edges to change in/out + duration
 - [x] Ripple / insert mode — neighbours shift instead of block (Ripple tool)
 - [x] Cross-layer clip move — drag a clip to another compatible track
-- [ ] Alignment aids — snap-to-edge dotted guides + origin ghost while moving
+- [x] Alignment aids — snap-to-edge dotted guides + origin ghost while moving
 - [ ] Razor / Cut — split a clip at the playhead
 - [ ] Snap (magnet) as a real toggle, not always-on
 - [ ] Zoom in/out — variable timeline scale (currently fixed 30s)
@@ -30,6 +30,20 @@ complete when every box below is checked.
 **Persistence / data**
 - [ ] Persist timeline (localStorage save + rehydrate; resets on refresh now)
 - [ ] Verify media import (+Import / file picker) adds usable assets
+
+## 2026-06-06 — Alignment aids (guides + origin ghost)
+
+- While moving a clip, a faint placeholder stays in the source lane with two
+  dotted vertical lines rising from its left/right edges. Those origin edges are
+  snap candidates, so a clip drops back into the same horizontal position on a
+  different layer; the line brightens when an edge snaps onto it.
+- `clipEdges()` gathers every other clip's edges + timeline ends; `alignEdges()`
+  pulls the nearest dragged edge onto the closest candidate within ~6px and
+  reports the x to draw. Edge-snap takes priority over second-snap on release.
+- Fix (the "only moves down a layer" report): it wasn't direction — the target
+  lane was full. `Main_theme` spanned 0–95% of A1, so nothing could move up into
+  it. Gave every track headroom in the seed (A1 60%, V1 opened a gap) so
+  cross-layer moves land in both directions.
 
 ## 2026-06-06 — Cross-layer clip move
 
