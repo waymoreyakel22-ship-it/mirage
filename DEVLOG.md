@@ -31,6 +31,15 @@ complete when every box below is checked.
 - [ ] Persist timeline (localStorage save + rehydrate; resets on refresh now)
 - [ ] Verify media import (+Import / file picker) adds usable assets
 
+## 2026-06-06 — Sticky origin snap + resize grips
+
+- Origin column now snaps with a wider threshold (~12px) and priority over other
+  edges (`snapMove`), so a clip stays glued under the ghost while sliding side to
+  side on any layer. Other edges keep the normal ~7px.
+- Resize seams (preview/timeline, sidebar, right) now show a grip affordance —
+  two bars + chevrons, quiet by default, brightens on hover. Row seam vertical;
+  col seams rotate the grip 90° to point along the drag axis.
+
 ## 2026-06-06 — Alignment aids (guides + origin ghost)
 
 - While moving a clip, a faint placeholder stays in the source lane with two

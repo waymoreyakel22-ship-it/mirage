@@ -41,3 +41,33 @@
   transition: background 0.12s;
 }
 .resize-row:hover::before { background: #242424; }
+
+/* Grip affordance — centred on the seam, brightens on hover */
+.resize-grip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: #4a4a4a;
+  pointer-events: none;
+  transition: color 0.12s, border-color 0.12s;
+}
+.resize-col:hover .resize-grip,
+.resize-row:hover .resize-grip {
+  color: #8a8a8a;
+  border-color: #2c2c2c;
+}
+.grip-icon {
+  width: 11px;
+  height: 15px;
+}
+/* Col seams are dragged left/right, so turn the grip on its side */
+.resize-col .grip-icon { transform: rotate(90deg); }

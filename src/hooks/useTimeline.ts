@@ -184,17 +184,23 @@ export function useTimeline() {
   // moving edge snaps to the nearest second on release. Move can change lanes
   // (compatible tracks only); resize stays on its track.
   useEffect(() => {
+    // Snap a position to nearby edges. The clip's own origin column wins with a
+    // wider threshold, so it stays glued under the ghost as you slide side to
+    // side; otherwise snap to other clips' edges / timeline ends.
+    function snapMove(d: NonNullable<typeof dragRef.current>, pos: number) {
+      const originEdges = [d.originLeft, d.originLeft + d.originWidth]
+      const origin = alignEdges(pos, d.width, originEdges, (12 / d.laneWidth) * 100)
+      if (origin.guide !== null) return origin
+      return alignEdges(pos, d.width, clipEdges(clipsRef.current, d.clipId), (7 / d.laneWidth) * 100)
+    }
+
     // Cursor Y → compatible target lane; horizontal X → snap to nearby clip edges
     // (drawing guides), else the nearest free slot in that lane.
     function moveTick(d: NonNullable<typeof dragRef.current>, e: MouseEvent) {
       setMoveOrigin(prev => prev ?? { trackId: d.trackId, left: d.originLeft, width: d.originWidth })
       const deltaPct = ((e.clientX - d.startX) / d.laneWidth) * 100
       const desired = clamp(d.originLeft + deltaPct, 0, 100 - d.width)
-      const threshold = (6 / d.laneWidth) * 100
-      // Snap candidates include the clip's own origin edges, so it can drop back
-      // into the same horizontal position on a different layer.
-      const edges = [...clipEdges(clipsRef.current, d.clipId), d.originLeft, d.originLeft + d.originWidth]
-      const { left: aligned, guide } = alignEdges(desired, d.width, edges, threshold)
+      const { left: aligned, guide } = snapMove(d, desired)
 
       const lane = d.lanes.find(
         l => l.accepts === d.kind && e.clientY >= l.rect.top && e.clientY <= l.rect.bottom,
@@ -247,9 +253,7 @@ export function useTimeline() {
       if (d.mode === 'move') {
         // Prefer an edge alignment; otherwise snap to the nearest second. Then
         // re-resolve to a free slot in the landing lane.
-        const threshold = (6 / d.laneWidth) * 100
-        const edges = [...clipEdges(clipsRef.current, d.clipId), d.originLeft, d.originLeft + d.originWidth]
-        const { left: aligned, guide } = alignEdges(d.left, d.width, edges, threshold)
+        const { left: aligned, guide } = snapMove(d, d.left)
         const target = guide !== null ? aligned : snapPctToSecond(d.left)
         const others = (clipsRef.current[d.currentTrack] ?? []).filter(c => c.id !== d.clipId)
         const left = findSlot(others, target, d.width) ?? d.left
