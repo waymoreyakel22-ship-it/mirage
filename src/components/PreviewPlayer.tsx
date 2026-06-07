@@ -1,10 +1,14 @@
+import { usePlayback } from '../context/PlaybackContext'
+import { formatTimecodeFrames } from '../lib/format'
 import './PreviewPlayer.css'
 
 export function PreviewPlayer({ height }: { height: number }) {
+  const { playheadSec, setPlayheadSec, playing, toggle, durationSec } = usePlayback()
+
   return (
     <div className="preview-panel" style={{ height, flex: '0 0 auto' }}>
       <div className="preview-toolbar">
-        <span className="timecode">0:00:00:00</span>
+        <span className="timecode">{formatTimecodeFrames(playheadSec)}</span>
       </div>
 
       <div className="video-screen">
@@ -14,11 +18,25 @@ export function PreviewPlayer({ height }: { height: number }) {
       </div>
 
       <div className="transport">
-        <button className="transport-btn" title="Skip to start"><IconSkipBack /></button>
-        <button className="transport-btn" title="Rewind"><IconRewind /></button>
-        <button className="transport-btn transport-play" title="Play"><IconPlay /></button>
-        <button className="transport-btn" title="Fast forward"><IconForward /></button>
-        <button className="transport-btn" title="Skip to end"><IconSkipForward /></button>
+        <button className="transport-btn" title="Skip to start" onClick={() => setPlayheadSec(0)}>
+          <IconSkipBack />
+        </button>
+        <button className="transport-btn" title="Back 5s" onClick={() => setPlayheadSec(playheadSec - 5)}>
+          <IconRewind />
+        </button>
+        <button
+          className="transport-btn transport-play"
+          title={playing ? 'Pause' : 'Play'}
+          onClick={toggle}
+        >
+          {playing ? <IconPause /> : <IconPlay />}
+        </button>
+        <button className="transport-btn" title="Forward 5s" onClick={() => setPlayheadSec(playheadSec + 5)}>
+          <IconForward />
+        </button>
+        <button className="transport-btn" title="Skip to end" onClick={() => setPlayheadSec(durationSec)}>
+          <IconSkipForward />
+        </button>
       </div>
     </div>
   )
@@ -46,6 +64,15 @@ function IconPlay() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M8 5 L19 12 L8 19 Z" />
+    </svg>
+  )
+}
+
+function IconPause() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="7" y="5" width="3.5" height="14" />
+      <rect x="13.5" y="5" width="3.5" height="14" />
     </svg>
   )
 }

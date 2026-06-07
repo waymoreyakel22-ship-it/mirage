@@ -29,3 +29,15 @@ export function formatTimecode(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
+
+/** seconds → "h:mm:ss:ff" SMPTE-style timecode at the given frame rate. */
+export function formatTimecodeFrames(totalSeconds: number, fps = 30): string {
+  const t = Math.max(0, totalSeconds)
+  const whole = Math.floor(t)
+  const ff = Math.floor((t - whole) * fps)
+  const h = Math.floor(whole / 3600)
+  const m = Math.floor((whole % 3600) / 60)
+  const s = whole % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${h}:${pad(m)}:${pad(s)}:${pad(ff)}`
+}

@@ -1,11 +1,39 @@
-import { RULER_MARKS, TOOLS, TRACKS } from '../data/timeline'
+import { useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { FPS, RULER_MARKS, TOOLS, TRACKS } from '../data/timeline'
 import { useTimeline } from '../hooks/useTimeline'
+import { usePlayback } from '../context/PlaybackContext'
+import { clamp, formatTimecodeFrames } from '../lib/format'
 import './Timeline.css'
-
-const PLAYHEAD = '28%'
 
 export function Timeline() {
   const tl = useTimeline()
+  const { playheadSec, setPlayheadSec, durationSec } = usePlayback()
+  const playhead = `${(playheadSec / durationSec) * 100}%`
+  const cutMode = tl.activeTool === 'razor' || tl.activeTool === 'cut'
+
+  // Frame-snapped dotted line that follows the cursor while the razor is active.
+  const [cutX, setCutX] = useState<number | null>(null)
+  const totalFrames = durationSec * FPS
+  function onLanesMove(e: ReactMouseEvent) {
+    if (!cutMode) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const pct = ((e.clientX - rect.left) / rect.width) * 100
+    setCutX((Math.round((pct / 100) * totalFrames) / totalFrames) * 100)
+  }
+
+  // Click or drag anywhere on the ruler to scrub the playhead.
+  function beginScrub(e: ReactMouseEvent) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const toSec = (x: number) => clamp(((x - rect.left) / rect.width) * durationSec, 0, durationSec)
+    setPlayheadSec(toSec(e.clientX))
+    const move = (ev: MouseEvent) => setPlayheadSec(toSec(ev.clientX))
+    const up = () => {
+      document.removeEventListener('mousemove', move)
+      document.removeEventListener('mouseup', up)
+    }
+    document.addEventListener('mousemove', move)
+    document.addEventListener('mouseup', up)
+  }
 
   return (
     <>
@@ -21,7 +49,7 @@ export function Timeline() {
           </button>
         ))}
         <span className="flex-spacer" />
-        <span className="timecode">0:00:30:00</span>
+        <span className="timecode">{formatTimecodeFrames(playheadSec)}</span>
       </div>
 
       <div className="track-area">
@@ -35,7 +63,7 @@ export function Timeline() {
         </div>
 
         <div className="tracks-scroll">
-          <div className="ruler">
+          <div className="ruler" onMouseDown={beginScrub}>
             {RULER_MARKS.map((mark, i) => (
               <div
                 key={mark}
@@ -45,11 +73,16 @@ export function Timeline() {
                 <span className="ruler-label">{mark}</span>
               </div>
             ))}
-            <div className="playhead-diamond" style={{ left: PLAYHEAD }} />
+            <div className="playhead-diamond" style={{ left: playhead }} />
           </div>
 
-          <div className="track-lanes">
-            <div className="playhead-line" style={{ left: PLAYHEAD }} />
+          <div
+            className={`track-lanes${cutMode ? ' cut-mode' : ''}`}
+            onMouseMove={onLanesMove}
+            onMouseLeave={() => setCutX(null)}
+          >
+            <div className="playhead-line" style={{ left: playhead }} />
+            {cutMode && cutX !== null && <div className="cut-cursor" style={{ left: `${cutX}%` }} />}
             {tl.moveOrigin &&
               [tl.moveOrigin.left, tl.moveOrigin.left + tl.moveOrigin.width].map((x, i) => (
                 <div key={`origin-${i}`} className="align-guide origin" style={{ left: `${x}%` }} />
@@ -91,16 +124,22 @@ export function Timeline() {
                         borderLeftColor: tr.color,
                         background: `${tr.color}18`,
                       }}
-                      onMouseDown={e => tl.beginClipDrag(e, tr.id, clip)}
+                      onMouseDown={e =>
+                        cutMode ? tl.razorAt(e, tr.id, clip) : tl.beginClipDrag(e, tr.id, clip)
+                      }
                     >
                       <div
                         className="clip-handle left"
-                        onMouseDown={e => tl.beginClipResize(e, tr.id, clip, 'l')}
+                        onMouseDown={e =>
+                          cutMode ? tl.razorAt(e, tr.id, clip) : tl.beginClipResize(e, tr.id, clip, 'l')
+                        }
                       />
                       <span className="clip-label">{clip.label}</span>
                       <div
                         className="clip-handle right"
-                        onMouseDown={e => tl.beginClipResize(e, tr.id, clip, 'r')}
+                        onMouseDown={e =>
+                          cutMode ? tl.razorAt(e, tr.id, clip) : tl.beginClipResize(e, tr.id, clip, 'r')
+                        }
                       />
                     </div>
                   ))}

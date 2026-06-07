@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { CLIPS, RULER_MARKS, TRACKS } from '../data/timeline'
+import { CLIPS, FPS, TIMELINE_SECONDS, TRACKS } from '../data/timeline'
 import { clamp, parseClockToSeconds } from '../lib/format'
 import { findSlot, gapAround } from '../lib/overlap'
 import { useSelection, type SelectedClip } from '../context/SelectionContext'
 import type { Asset, Clip, Tool } from '../types'
 
-const TIMELINE_SECONDS = parseClockToSeconds(RULER_MARKS[RULER_MARKS.length - 1])
 const DEFAULT_CLIP_SECONDS = 4
+const TOTAL_FRAMES = TIMELINE_SECONDS * FPS
+const FRAME_PCT = (1 / TOTAL_FRAMES) * 100
 const MIN_CLIP_SECONDS = 1
 const MIN_WIDTH_PCT = (MIN_CLIP_SECONDS / TIMELINE_SECONDS) * 100
 const EPS = 0.01
@@ -39,6 +40,9 @@ const snapPctToSecond = (pct: number) => {
   const sec = clamp(Math.round((pct / 100) * TIMELINE_SECONDS), 0, TIMELINE_SECONDS)
   return (sec / TIMELINE_SECONDS) * 100
 }
+
+const snapPctToFrame = (pct: number) =>
+  (clamp(Math.round((pct / 100) * TOTAL_FRAMES), 0, TOTAL_FRAMES) / TOTAL_FRAMES) * 100
 
 const durToWidthPct = (durSec: number) =>
   (clamp(durSec, 1, TIMELINE_SECONDS) / TIMELINE_SECONDS) * 100
@@ -377,6 +381,26 @@ export function useTimeline() {
   const beginClipResize = (e: ReactMouseEvent<HTMLDivElement>, trackId: string, clip: Clip, edge: 'l' | 'r') =>
     beginDrag(e, edge === 'l' ? 'resize-l' : 'resize-r', trackId, clip)
 
+  // Razor: split a clip at the click point (snapped to the frame) into two
+  // pieces, each at least one frame wide. Out of range → no-op.
+  function razorAt(e: ReactMouseEvent<HTMLDivElement>, trackId: string, clip: Clip) {
+    e.stopPropagation()
+    const lane = (e.currentTarget as HTMLElement).closest('.track-lane')
+    if (!lane) return
+    const rect = lane.getBoundingClientRect()
+    const cut = snapPctToFrame(((e.clientX - rect.left) / rect.width) * 100)
+    const right = clip.left + clip.width
+    if (cut < clip.left + FRAME_PCT || cut > right - FRAME_PCT) return
+
+    const a: Clip = { id: crypto.randomUUID(), left: clip.left, width: cut - clip.left, label: clip.label }
+    const b: Clip = { id: crypto.randomUUID(), left: cut, width: right - cut, label: clip.label }
+    setClips(prev => ({
+      ...prev,
+      [trackId]: prev[trackId].flatMap(c => (c.id === clip.id ? [a, b] : [c])),
+    }))
+    setSelectedClip(describe(trackId, b))
+  }
+
   const selectNone = () => setSelectedClip(null)
 
   function onTrackDragOver(e: ReactDragEvent<HTMLDivElement>, accepts: string, id: string) {
@@ -471,6 +495,7 @@ export function useTimeline() {
     selectedId: selectedClip?.id ?? null,
     beginClipDrag,
     beginClipResize,
+    razorAt,
     selectNone,
     onTrackDragOver,
     onTrackDragLeave,

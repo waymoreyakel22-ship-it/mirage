@@ -76,6 +76,8 @@
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   min-width: 100%;
+  cursor: ew-resize;
+  user-select: none;
 }
 .ruler-tick {
   position: absolute;
@@ -201,6 +203,22 @@
   transition: border-color 0.12s, background 0.12s;
 }
 .clip:hover { border-color: rgba(255, 255, 255, 0.18); }
+
+/* Razor/Cut tool active — clicking a clip splits it */
+.track-lanes.cut-mode .clip,
+.track-lanes.cut-mode .clip-handle { cursor: crosshair; }
+
+/* Dotted line tracking the cursor where the razor will cut */
+.cut-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dotted rgba(229, 72, 72, 0.75);
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 7;
+}
 .clip.selected {
   box-shadow: 0 0 0 1px var(--accent);
   z-index: 2;

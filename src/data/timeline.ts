@@ -1,3 +1,4 @@
+import { parseClockToSeconds } from '../lib/format'
 import type { Tool } from '../types'
 
 export const TRACKS = [
@@ -21,6 +22,12 @@ export const CLIPS: Record<string, { left: number; width: number; label: string 
 }
 
 export const RULER_MARKS = ['0:00', '0:05', '0:10', '0:15', '0:20', '0:25', '0:30']
+
+// Total timeline length (seconds), derived from the last ruler mark.
+export const TIMELINE_SECONDS = parseClockToSeconds(RULER_MARKS[RULER_MARKS.length - 1])
+
+// Project frame rate — drives timecode display and frame-accurate razor cuts.
+export const FPS = 30
 
 export const TOOLS: { id: Tool; label: string; glyph: string }[] = [
   { id: 'select',   label: 'Select',        glyph: '↖' },

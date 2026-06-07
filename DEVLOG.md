@@ -14,14 +14,14 @@ complete when every box below is checked.
 - [x] Ripple / insert mode — neighbours shift instead of block (Ripple tool)
 - [x] Cross-layer clip move — drag a clip to another compatible track
 - [x] Alignment aids — snap-to-edge dotted guides + origin ghost while moving
-- [ ] Razor / Cut — split a clip at the playhead
+- [x] Razor / Cut — split a clip at the click point (frame-accurate)
 - [ ] Snap (magnet) as a real toggle, not always-on
 - [ ] Zoom in/out — variable timeline scale (currently fixed 30s)
 
 **Playback / playhead**
-- [ ] Play/pause — wire transport, running timecode
-- [ ] Scrubbing — draggable playhead + click-to-seek (currently static 28%)
-- [ ] Top-bar timecode reflects playhead position
+- [x] Play/pause — wire transport, running timecode
+- [x] Scrubbing — draggable playhead + click-to-seek (ruler)
+- [x] Top-bar timecode reflects playhead position
 
 **AI / right panel**
 - [ ] AI thoughts panel trigger (built, never surfaced)
@@ -30,6 +30,25 @@ complete when every box below is checked.
 **Persistence / data**
 - [ ] Persist timeline (localStorage save + rehydrate; resets on refresh now)
 - [ ] Verify media import (+Import / file picker) adds usable assets
+
+## 2026-06-06 — Playback (play/scrub/timecode) + Razor
+
+### Playback / playhead
+- New minimal `context/PlaybackContext.tsx`: `playheadSec`, `setPlayheadSec`,
+  `playing`, `toggle`, `durationSec`. Play advances the playhead via rAF in real
+  time and stops at the end (restarts from 0 if played from the end).
+- Playhead is now real state (was static 28%). Ruler is click/drag scrubbable.
+- PreviewPlayer transport wired: skip-to-start/end, ±5s, play/pause (icon swaps).
+- Both timecodes (preview top-bar + timeline toolbar) show the live playhead as
+  `h:mm:ss:ff` via new `formatTimecodeFrames`. Shared `TIMELINE_SECONDS`/`FPS`
+  constants moved to `data/timeline.ts`.
+
+### Razor / Cut
+- Razor or Cut tool → crosshair over clips; clicking splits the clip in two.
+- Cuts snap to the frame (30fps) for accuracy (was second-snapped); each piece
+  ≥1 frame. A red dotted cut-cursor follows the pointer (frame-snapped) so you
+  see exactly where the cut lands before clicking.
+- Pieces are independent clips (move/trim/ripple/cross-layer like any other).
 
 ## 2026-06-06 — Sticky origin snap + resize grips
 
