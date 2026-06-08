@@ -15,8 +15,8 @@ complete when every box below is checked.
 - [x] Cross-layer clip move — drag a clip to another compatible track
 - [x] Alignment aids — snap-to-edge dotted guides + origin ghost while moving
 - [x] Razor / Cut — split a clip at the click point (frame-accurate)
-- [ ] Snap (magnet) as a real toggle, not always-on
-- [ ] Zoom in/out — variable timeline scale (currently fixed 30s)
+- [x] Snap (magnet) as a real toggle, not always-on
+- [x] Zoom in/out — variable timeline scale
 
 **Playback / playhead**
 - [x] Play/pause — wire transport, running timecode
@@ -30,6 +30,17 @@ complete when every box below is checked.
 **Persistence / data**
 - [ ] Persist timeline (localStorage save + rehydrate; resets on refresh now)
 - [ ] Verify media import (+Import / file picker) adds usable assets
+
+## 2026-06-06 — Snap toggle + Zoom
+
+- Magnet (⊕) is now a real snap on/off toggle, separate from the active tool
+  (`snapEnabled` in useTimeline). Off → clip move/drop is free (frame precision,
+  no edge guides, no second-quantise); overlap prevention stays. Razor always
+  frame-accurate. `landing()` takes a snap flag; `snapMove`/second-snap gated.
+- Zoom in/out widens the ruler + lanes (×1.5, 1–8) via inline width; horizontal
+  scroll appears. All drag/drop/scrub/razor math holds because positions are %
+  read against the live element width. Toolbar special-cases magnet (toggle) and
+  zoom (actions) vs the exclusive mode tools.
 
 ## 2026-06-06 — Playback (play/scrub/timecode) + Razor
 

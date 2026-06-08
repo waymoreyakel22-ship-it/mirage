@@ -48,11 +48,11 @@ const durToWidthPct = (durSec: number) =>
   (clamp(durSec, 1, TIMELINE_SECONDS) / TIMELINE_SECONDS) * 100
 
 // Where a width-wide clip would land if dropped at the cursor: the cursor X
-// snapped to the nearest second, then resolved to the closest free gap.
-function landing(rect: DOMRect, clientX: number, width: number, existing: Clip[]) {
-  const ratio = (clientX - rect.left) / rect.width
-  const startSec = clamp(Math.round(ratio * TIMELINE_SECONDS), 0, TIMELINE_SECONDS)
-  const desiredLeft = (startSec / TIMELINE_SECONDS) * 100
+// quantised (to the second when snapping is on, else to the frame), then
+// resolved to the closest free gap.
+function landing(rect: DOMRect, clientX: number, width: number, existing: Clip[], snap: boolean) {
+  const raw = ((clientX - rect.left) / rect.width) * 100
+  const desiredLeft = snap ? snapPctToSecond(raw) : snapPctToFrame(raw)
   return { desiredLeft, placedLeft: findSlot(existing, desiredLeft, width) }
 }
 
@@ -135,6 +135,7 @@ export function useTimeline() {
   const [dropTarget, setDropTarget] = useState<DropTarget>(null)
   const [ghost, setGhost] = useState<Ghost>(null)
   const [activeTool, setActiveTool] = useState<Tool>('select')
+  const [snapEnabled, setSnapEnabled] = useState(true)
   // Move-drag alignment aids: vertical guide lines + a placeholder in the source lane.
   const [guides, setGuides] = useState<number[]>([])
   const [moveOrigin, setMoveOrigin] = useState<{ trackId: string; left: number; width: number } | null>(null)
@@ -144,6 +145,8 @@ export function useTimeline() {
   selectedRef.current = selectedClip
   const activeToolRef = useRef(activeTool)
   activeToolRef.current = activeTool
+  const snapRef = useRef(snapEnabled)
+  snapRef.current = snapEnabled
   const clipsRef = useRef(clips)
   clipsRef.current = clips
 
@@ -204,7 +207,7 @@ export function useTimeline() {
       setMoveOrigin(prev => prev ?? { trackId: d.trackId, left: d.originLeft, width: d.originWidth })
       const deltaPct = ((e.clientX - d.startX) / d.laneWidth) * 100
       const desired = clamp(d.originLeft + deltaPct, 0, 100 - d.width)
-      const { left: aligned, guide } = snapMove(d, desired)
+      const { left: aligned, guide } = snapRef.current ? snapMove(d, desired) : { left: desired, guide: null }
 
       const lane = d.lanes.find(
         l => l.accepts === d.kind && e.clientY >= l.rect.top && e.clientY <= l.rect.bottom,
@@ -255,10 +258,13 @@ export function useTimeline() {
       if (!d.moved) return
 
       if (d.mode === 'move') {
-        // Prefer an edge alignment; otherwise snap to the nearest second. Then
-        // re-resolve to a free slot in the landing lane.
-        const { left: aligned, guide } = snapMove(d, d.left)
-        const target = guide !== null ? aligned : snapPctToSecond(d.left)
+        // Prefer an edge alignment; otherwise snap to the nearest second. With
+        // snapping off, drop at the raw position. Then re-resolve to a free slot.
+        let target = d.left
+        if (snapRef.current) {
+          const { left: aligned, guide } = snapMove(d, d.left)
+          target = guide !== null ? aligned : snapPctToSecond(d.left)
+        }
         const others = (clipsRef.current[d.currentTrack] ?? []).filter(c => c.id !== d.clipId)
         const left = findSlot(others, target, d.width) ?? d.left
         setClips(prev => relocate(prev, d.clipId, d.currentTrack, left))
@@ -417,7 +423,7 @@ export function useTimeline() {
 
     const existing = clips[id] ?? []
     const width = durToWidthPct(draggedDuration(e.dataTransfer.types) ?? DEFAULT_CLIP_SECONDS)
-    const { desiredLeft, placedLeft } = landing(e.currentTarget.getBoundingClientRect(), e.clientX, width, existing)
+    const { desiredLeft, placedLeft } = landing(e.currentTarget.getBoundingClientRect(), e.clientX, width, existing, snapEnabled)
 
     // Ripple mode inserts (pushes downstream right); Select mode drops into a gap.
     let fits: boolean
@@ -467,7 +473,7 @@ export function useTimeline() {
     const existing = clips[id] ?? []
     const duration = parseClockToSeconds(asset.sub)
     const width = durToWidthPct(Number.isNaN(duration) ? DEFAULT_CLIP_SECONDS : duration)
-    const { desiredLeft, placedLeft } = landing(e.currentTarget.getBoundingClientRect(), e.clientX, width, existing)
+    const { desiredLeft, placedLeft } = landing(e.currentTarget.getBoundingClientRect(), e.clientX, width, existing, snapEnabled)
 
     if (activeTool === 'ripple') {
       const plan = rippleInsertPlan(existing, desiredLeft, width)
@@ -492,6 +498,8 @@ export function useTimeline() {
     moveOrigin,
     activeTool,
     setActiveTool,
+    snapEnabled,
+    toggleSnap: () => setSnapEnabled(s => !s),
     selectedId: selectedClip?.id ?? null,
     beginClipDrag,
     beginClipResize,

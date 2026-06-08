@@ -21,6 +21,19 @@ export function Timeline() {
     setCutX((Math.round((pct / 100) * totalFrames) / totalFrames) * 100)
   }
 
+  // Horizontal zoom: widen the ruler + lanes (clip %s stay valid). 1 = fit.
+  const [zoom, setZoom] = useState(1)
+  const zoomIn = () => setZoom(z => Math.min(z * 1.5, 8))
+  const zoomOut = () => setZoom(z => Math.max(z / 1.5, 1))
+  const scaleStyle = { width: `${zoom * 100}%` }
+
+  function toolProps(id: string) {
+    if (id === 'magnet') return { active: tl.snapEnabled, onClick: tl.toggleSnap }
+    if (id === 'zoom-in') return { active: false, onClick: zoomIn }
+    if (id === 'zoom-out') return { active: false, onClick: zoomOut }
+    return { active: tl.activeTool === id, onClick: () => tl.setActiveTool(id as typeof tl.activeTool) }
+  }
+
   // Click or drag anywhere on the ruler to scrub the playhead.
   function beginScrub(e: ReactMouseEvent) {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -38,16 +51,19 @@ export function Timeline() {
   return (
     <>
       <div className="timeline-toolbar">
-        {TOOLS.map(t => (
-          <button
-            key={t.id}
-            className={`tool-btn${tl.activeTool === t.id ? ' active' : ''}`}
-            title={t.label}
-            onClick={() => tl.setActiveTool(t.id)}
-          >
-            {t.glyph}
-          </button>
-        ))}
+        {TOOLS.map(t => {
+          const { active, onClick } = toolProps(t.id)
+          return (
+            <button
+              key={t.id}
+              className={`tool-btn${active ? ' active' : ''}`}
+              title={t.id === 'magnet' ? `Snapping ${tl.snapEnabled ? 'on' : 'off'}` : t.label}
+              onClick={onClick}
+            >
+              {t.glyph}
+            </button>
+          )
+        })}
         <span className="flex-spacer" />
         <span className="timecode">{formatTimecodeFrames(playheadSec)}</span>
       </div>
@@ -63,7 +79,7 @@ export function Timeline() {
         </div>
 
         <div className="tracks-scroll">
-          <div className="ruler" onMouseDown={beginScrub}>
+          <div className="ruler" onMouseDown={beginScrub} style={scaleStyle}>
             {RULER_MARKS.map((mark, i) => (
               <div
                 key={mark}
@@ -78,6 +94,7 @@ export function Timeline() {
 
           <div
             className={`track-lanes${cutMode ? ' cut-mode' : ''}`}
+            style={scaleStyle}
             onMouseMove={onLanesMove}
             onMouseLeave={() => setCutX(null)}
           >
