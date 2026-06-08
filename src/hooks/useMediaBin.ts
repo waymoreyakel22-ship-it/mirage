@@ -1,11 +1,28 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { DEFAULT_FOLDERS, INITIAL_MEDIA } from '../data/media'
-import { formatSize, kindFromName, parseClockToSeconds } from '../lib/format'
-import type { Asset, BinView, Folder } from '../types'
+import { formatSize, formatTimecode, kindFromName, parseClockToSeconds } from '../lib/format'
+import type { Asset, BinView, Folder, Kind } from '../types'
 
 const isDefaultFolder = (id: string) => DEFAULT_FOLDERS.some(f => f.id === id)
 const isTypeFolder = (id: string): id is 'video' | 'music' | 'images' =>
   id === 'video' || id === 'music' || id === 'images'
+
+// Read a local file's real duration via a throwaway media element. Resolves null
+// for images or unreadable files. The object URL is revoked once metadata loads.
+function readMediaDuration(file: File, kind: Kind): Promise<number | null> {
+  return new Promise(resolve => {
+    if (kind !== 'video' && kind !== 'music') return resolve(null)
+    const el = document.createElement(kind === 'video' ? 'video' : 'audio')
+    el.preload = 'metadata'
+    const done = (v: number | null) => {
+      URL.revokeObjectURL(el.src)
+      resolve(v)
+    }
+    el.onloadedmetadata = () => done(Number.isFinite(el.duration) ? el.duration : null)
+    el.onerror = () => done(null)
+    el.src = URL.createObjectURL(file)
+  })
+}
 
 export function useMediaBin() {
   const [folders, setFolders]           = useState<Folder[]>(DEFAULT_FOLDERS)
@@ -48,15 +65,29 @@ export function useMediaBin() {
 
   function onFilesPicked(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
-    const added: Asset[] = files.map((f, i) => ({
-      id: `a${Date.now()}_${i}`,
-      name: f.name,
-      kind: kindFromName(f.name),
-      sub: formatSize(f.size),
-      folderId: isDefaultFolder(activeFolderId) ? undefined : activeFolderId,
-    }))
-    if (added.length) setMedia(prev => [...prev, ...added])
     e.target.value = ''
+    if (!files.length) return
+
+    const entries = files.map((f, i) => {
+      const kind = kindFromName(f.name)
+      const asset: Asset = {
+        id: `a${Date.now()}_${i}`,
+        name: f.name,
+        kind,
+        sub: formatSize(f.size), // placeholder until real duration loads (A/V)
+        folderId: isDefaultFolder(activeFolderId) ? undefined : activeFolderId,
+      }
+      return { asset, file: f, kind }
+    })
+    setMedia(prev => [...prev, ...entries.map(en => en.asset)])
+
+    // Swap file size → real duration for audio/video once metadata is read.
+    for (const { asset, file, kind } of entries) {
+      readMediaDuration(file, kind).then(dur => {
+        if (dur == null) return
+        setMedia(prev => prev.map(m => (m.id === asset.id ? { ...m, sub: formatTimecode(dur) } : m)))
+      })
+    }
   }
 
   function openMenu(e: ReactMouseEvent) {

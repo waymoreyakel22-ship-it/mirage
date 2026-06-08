@@ -12,6 +12,7 @@ export function MediaBin() {
       <div className="bin-toolbar">
         <span className="bin-title">Media pool</span>
         <span className="flex-spacer" />
+        <button className="bin-view-btn" title="Import files" onClick={bin.importFiles}>⤓</button>
         <button
           className={`bin-view-btn${bin.binView === 'grid' ? ' active' : ''}`}
           title="Grid view"

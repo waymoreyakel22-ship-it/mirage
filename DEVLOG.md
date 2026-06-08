@@ -29,7 +29,16 @@ complete when every box below is checked.
 
 **Persistence / data**
 - [x] Persist timeline (localStorage save + rehydrate + reset)
-- [ ] Verify media import (+Import / file picker) adds usable assets
+- [x] Media import — +Import button, real A/V duration, draggable assets
+
+## 2026-06-06 — Media import
+
+- Explicit Import button (⤓) in the bin toolbar (alongside right-click import).
+- Imported video/audio get their real duration read via a throwaway media
+  element (`readMediaDuration`); bin subtitle swaps file-size → `m:ss` on load,
+  object URL revoked after. Images keep file size.
+- Real duration means dragging an imported asset makes a correctly-sized clip
+  (not the 4s fallback). Assets land in the right folder/type and are draggable.
 
 ## 2026-06-06 — Timeline persistence
 
