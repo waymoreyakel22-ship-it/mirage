@@ -3,7 +3,7 @@
 ## Phase 2 checklist (functionality)
 
 Living tracker for Phase 2 — the shell becomes a working editor. Phase 2 is
-complete when every box below is checked.
+complete when every box below is checked. **STATUS: complete (2026-06-06).**
 
 **Timeline / clips**
 - [x] Drag-and-drop media pool → timeline (kind-gated V/A tracks)
@@ -24,12 +24,22 @@ complete when every box below is checked.
 - [x] Top-bar timecode reflects playhead position
 
 **AI / right panel**
-- [ ] AI thoughts panel trigger (built, never surfaced)
-- [ ] Suggestions are interactive (click → jump/apply), not static mock
+- [x] AI thoughts panel trigger (Analyze button → stepped thinking panel)
+- [x] Suggestions are interactive (click → seek playhead to timecode)
 
 **Persistence / data**
 - [x] Persist timeline (localStorage save + rehydrate + reset)
 - [x] Media import — +Import button, real A/V duration, draggable assets
+
+## 2026-06-06 — AI panel trigger + interactive suggestions (Phase 2 complete)
+
+- New minimal `context/AiContext.tsx`: `analyze()` runs a fake stepped analysis
+  (3 log lines, 0.8s each) then auto-hides; `dismiss()` cancels.
+- AiThoughts panel is now driven by it — slides up on analyze, steps through
+  done/active/pending lines, shows "Analysis complete", closes on ✕.
+- Analyze button added to the Suggestions section header (right panel).
+- Suggestion cards are buttons → click seeks the playhead to their timecode
+  (mock times moved within the 30s timeline). **Phase 2 done.**
 
 ## 2026-06-06 — Media import
 

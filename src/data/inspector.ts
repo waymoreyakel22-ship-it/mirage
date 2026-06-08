@@ -5,9 +5,9 @@ export const FP_STATS = [
 ]
 
 export const SUGGESTIONS = [
-  { title: 'Tighten B-roll cut', desc: 'Cut at 0:42 is 2 s too long', time: '0:42' },
-  { title: 'Add music fade',     desc: 'Music ends abruptly at 1:20', time: '1:20' },
-  { title: 'Remove silence',     desc: '3.1 s gap detected at 0:18',  time: '0:18' },
+  { title: 'Tighten B-roll cut', desc: 'Cut at 0:21 runs 2 s long',   time: '0:21' },
+  { title: 'Add music fade',     desc: 'Music ends abruptly at 0:27', time: '0:27' },
+  { title: 'Remove silence',     desc: '3.1 s gap detected at 0:08',  time: '0:08' },
 ]
 
 export const STYLE_PATTERNS = [

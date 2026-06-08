@@ -4,6 +4,7 @@ import { Center } from './components/Center'
 import { Inspector } from './components/Inspector'
 import { ResizeHandle } from './components/ResizeHandle'
 import { Sidebar } from './components/Sidebar'
+import { AiProvider } from './context/AiContext'
 import { PlaybackProvider } from './context/PlaybackContext'
 import { SelectionProvider } from './context/SelectionContext'
 import { useResizablePanels } from './hooks/useResizablePanels'
@@ -15,6 +16,7 @@ export default function App() {
 
   return (
     <PlaybackProvider>
+    <AiProvider>
     <SelectionProvider>
       <div className="app" style={{ gridTemplateColumns: `${sidebarW}px 1fr ${rightW}px` }}>
         <Sidebar />
@@ -30,6 +32,7 @@ export default function App() {
         <ResizeHandle orientation="col" side="right" style={{ right: rightW }} onMouseDown={e => startDrag('right', e)} />
       </div>
     </SelectionProvider>
+    </AiProvider>
     </PlaybackProvider>
   )
 }
