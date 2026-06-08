@@ -65,6 +65,17 @@ export function Timeline() {
           )
         })}
         <span className="flex-spacer" />
+        <button
+          className="tool-btn"
+          title="Reset timeline"
+          onClick={() => {
+            if (confirm('Reset the timeline to its starting layout? Your changes will be lost.')) {
+              tl.resetTimeline()
+            }
+          }}
+        >
+          ⟲
+        </button>
         <span className="timecode">{formatTimecodeFrames(playheadSec)}</span>
       </div>
 

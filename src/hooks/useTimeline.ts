@@ -8,6 +8,7 @@ import type { Asset, Clip, Tool } from '../types'
 const DEFAULT_CLIP_SECONDS = 4
 const TOTAL_FRAMES = TIMELINE_SECONDS * FPS
 const FRAME_PCT = (1 / TOTAL_FRAMES) * 100
+const STORAGE_KEY = 'mirage.timeline.v1'
 const MIN_CLIP_SECONDS = 1
 const MIN_WIDTH_PCT = (MIN_CLIP_SECONDS / TIMELINE_SECONDS) * 100
 const EPS = 0.01
@@ -22,6 +23,30 @@ function initClips(): Record<string, Clip[]> {
   const out: Record<string, Clip[]> = {}
   for (const id in CLIPS) out[id] = CLIPS[id].map(c => ({ id: crypto.randomUUID(), ...c }))
   return out
+}
+
+// Rehydrate the saved timeline; null on missing/corrupt data (→ fall back to seed).
+function loadClips(): Record<string, Clip[]> | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw)
+    if (!data || typeof data !== 'object') return null
+    const out: Record<string, Clip[]> = {}
+    for (const t of TRACKS) {
+      const arr = data[t.id]
+      if (!Array.isArray(arr)) return null
+      out[t.id] = arr.map((c: Clip) => ({
+        id: String(c.id),
+        left: Number(c.left),
+        width: Number(c.width),
+        label: String(c.label),
+      }))
+    }
+    return out
+  } catch {
+    return null
+  }
 }
 
 function draggedKind(types: readonly string[]): string | null {
@@ -131,7 +156,7 @@ function describe(trackId: string, clip: Clip): SelectedClip {
 
 export function useTimeline() {
   const { selectedClip, setSelectedClip } = useSelection()
-  const [clips, setClips] = useState<Record<string, Clip[]>>(initClips)
+  const [clips, setClips] = useState<Record<string, Clip[]>>(() => loadClips() ?? initClips())
   const [dropTarget, setDropTarget] = useState<DropTarget>(null)
   const [ghost, setGhost] = useState<Ghost>(null)
   const [activeTool, setActiveTool] = useState<Tool>('select')
@@ -149,6 +174,18 @@ export function useTimeline() {
   snapRef.current = snapEnabled
   const clipsRef = useRef(clips)
   clipsRef.current = clips
+
+  // Persist the timeline, debounced so a drag doesn't thrash localStorage.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(clips))
+      } catch {
+        // storage full or unavailable — non-fatal, edits simply won't persist
+      }
+    }, 400)
+    return () => clearTimeout(t)
+  }, [clips])
 
   const dragRef = useRef<{
     mode: DragMode
@@ -409,6 +446,17 @@ export function useTimeline() {
 
   const selectNone = () => setSelectedClip(null)
 
+  // Reset the timeline back to the seed layout and drop the saved copy.
+  function resetTimeline() {
+    setClips(initClips())
+    setSelectedClip(null)
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // ignore
+    }
+  }
+
   function onTrackDragOver(e: ReactDragEvent<HTMLDivElement>, accepts: string, id: string) {
     const kind = draggedKind(e.dataTransfer.types)
     if (!kind) return
@@ -505,6 +553,7 @@ export function useTimeline() {
     beginClipResize,
     razorAt,
     selectNone,
+    resetTimeline,
     onTrackDragOver,
     onTrackDragLeave,
     onTrackDrop,

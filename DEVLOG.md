@@ -28,8 +28,16 @@ complete when every box below is checked.
 - [ ] Suggestions are interactive (click → jump/apply), not static mock
 
 **Persistence / data**
-- [ ] Persist timeline (localStorage save + rehydrate; resets on refresh now)
+- [x] Persist timeline (localStorage save + rehydrate + reset)
 - [ ] Verify media import (+Import / file picker) adds usable assets
+
+## 2026-06-06 — Timeline persistence
+
+- Timeline now persists to `localStorage` (`mirage.timeline.v1`): debounced save
+  (400ms) on clip change, rehydrate on mount via `loadClips()` (validates shape,
+  falls back to seed on missing/corrupt). Survives full refresh.
+- Reset button (⟲) in the timeline toolbar restores the seed layout and clears
+  the saved copy (with a confirm).
 
 ## 2026-06-06 — Snap toggle + Zoom
 
